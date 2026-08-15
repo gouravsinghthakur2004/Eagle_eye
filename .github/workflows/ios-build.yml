@@ -1,0 +1,56 @@
+name: Build iOS App (Eagle Eye)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS Binary
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: EagleEye/package-lock.json
+
+      - name: Install JS dependencies
+        run: |
+          cd EagleEye
+          npm ci
+
+      - name: Install CocoaPods
+        run: |
+          cd EagleEye/ios
+          pod install
+
+      - name: Build iOS Archive / App
+        run: |
+          cd EagleEye/ios
+          xcodebuild -workspace EagleEye.xcworkspace \
+                     -scheme EagleEye \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     -derivedDataPath build \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     build
+
+      - name: Package App Bundle
+        run: |
+          cd EagleEye/ios/build/Build/Products/Release-iphoneos
+          mkdir -p Payload
+          cp -r EagleEye.app Payload/
+          zip -r EagleEye.ipa Payload
+
+      - name: Upload iOS (.ipa) Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EagleEye-iOS-IPA
+          path: EagleEye/ios/build/Build/Products/Release-iphoneos/EagleEye.ipa

@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build outputs and binaries
+*.apk
+*.aab
+*.ipa
+build/
+.gradle/
+.idea/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+*.log
