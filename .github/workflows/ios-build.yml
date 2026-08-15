@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-ios:
-    name: Build iOS Binary
+    name: Build iOS App Binary
     runs-on: macos-14
     steps:
       - name: Checkout repository
@@ -17,40 +17,73 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: EagleEye/package-lock.json
 
       - name: Install JS dependencies
         run: |
           cd EagleEye
           npm ci
 
+      - name: Pre-bundle React Native JS Assets
+        run: |
+          cd EagleEye
+          mkdir -p ios/main.jsbundle.assets
+          npx react-native bundle \
+            --entry-file index.js \
+            --platform ios \
+            --dev false \
+            --bundle-output ios/main.jsbundle \
+            --assets-dest ios
+
       - name: Install CocoaPods
         run: |
           cd EagleEye/ios
-          pod install
+          pod install --repo-update
 
-      - name: Build iOS Archive / App
+      - name: Build iOS Simulator App (For Mac / Simulator)
         run: |
           cd EagleEye/ios
           xcodebuild -workspace EagleEye.xcworkspace \
                      -scheme EagleEye \
-                     -sdk iphoneos \
+                     -sdk iphonesimulator \
                      -configuration Release \
                      -derivedDataPath build \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_IDENTITY="" \
                      build
 
-      - name: Package App Bundle
+      - name: Package Simulator (.app) for Mac
         run: |
-          cd EagleEye/ios/build/Build/Products/Release-iphoneos
+          cd EagleEye/ios/build/Build/Products/Release-iphonesimulator
+          zip -r EagleEye-Mac-Simulator.zip EagleEye.app
+
+      - name: Build iOS Physical Device Archive (.ipa)
+        run: |
+          cd EagleEye/ios
+          xcodebuild archive \
+                     -workspace EagleEye.xcworkspace \
+                     -scheme EagleEye \
+                     -configuration Release \
+                     -archivePath build/EagleEye.xcarchive \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_IDENTITY=""
+
+      - name: Package .ipa for iOS
+        run: |
+          cd EagleEye/ios/build/EagleEye.xcarchive/Products/Applications
           mkdir -p Payload
           cp -r EagleEye.app Payload/
-          zip -r EagleEye.ipa Payload
+          zip -r EagleEye-Unsigned.ipa Payload
 
-      - name: Upload iOS (.ipa) Artifact
+      - name: Upload Mac / Simulator App (.zip)
         uses: actions/upload-artifact@v4
         with:
-          name: EagleEye-iOS-IPA
-          path: EagleEye/ios/build/Build/Products/Release-iphoneos/EagleEye.ipa
+          name: EagleEye-Mac-Simulator-App
+          path: EagleEye/ios/build/Build/Products/Release-iphonesimulator/EagleEye-Mac-Simulator.zip
+
+      - name: Upload iOS Unsigned Package (.ipa)
+        uses: actions/upload-artifact@v4
+        with:
+          name: EagleEye-iOS-Unsigned-IPA
+          path: EagleEye/ios/build/EagleEye.xcarchive/Products/Applications/EagleEye-Unsigned.ipa
