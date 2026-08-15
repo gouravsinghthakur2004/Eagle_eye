@@ -1,6 +1,11 @@
 # OSX
-#
 .DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.xcode.env
 
 # Xcode
 #

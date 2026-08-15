@@ -1,3 +1,9 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+!.xcode.env
+
 # Dependencies
 node_modules/
 
