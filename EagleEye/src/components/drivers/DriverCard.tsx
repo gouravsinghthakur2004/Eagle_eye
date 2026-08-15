@@ -6,10 +6,10 @@ import { DriverNavigatorProfile } from '@/types';
 interface DriverCardProps {
   driver: DriverNavigatorProfile;
   onEdit: (driver: DriverNavigatorProfile) => void;
-  onRemove: (id: string | number) => void;
+  onRemove?: (id: string | number) => void;
 }
 
-export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit, onRemove }) => {
+export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit }) => {
   return (
     <View style={styles.tableRow}>
       {/* Driver Name Column */}
@@ -35,12 +35,6 @@ export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit, onRemove
       <View style={styles.actionCol}>
         <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(driver)}>
           <Text style={styles.editBtnText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.removeBtn}
-          onPress={() => driver.id && onRemove(driver.id)}
-        >
-          <Text style={styles.removeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -82,11 +76,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionCol: {
-    flex: 1.4,
+    flex: 1.2,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 6,
   },
   editBtn: {
     backgroundColor: 'rgba(255, 122, 0, 0.15)',
@@ -98,21 +91,6 @@ const styles = StyleSheet.create({
   },
   editBtnText: {
     color: COLORS.accentOrange,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  removeBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeBtnText: {
-    color: '#EF4444',
     fontSize: 11,
     fontWeight: '800',
   },

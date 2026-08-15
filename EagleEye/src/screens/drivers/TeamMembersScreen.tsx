@@ -208,14 +208,13 @@ export const TeamMembersScreen: React.FC = () => {
                 <View style={styles.tableHeaderRow}>
                   <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>DRIVER NAME</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>MOBILE NO.</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>ACTIONS</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>ACTIONS</Text>
                 </View>
                 {drivers.map((driver) => (
                   <DriverCard
                     key={String(driver.id)}
                     driver={driver}
                     onEdit={handleOpenEditDriver}
-                    onRemove={handleRemoveDriver}
                   />
                 ))}
               </View>
@@ -249,14 +248,13 @@ export const TeamMembersScreen: React.FC = () => {
                 <View style={styles.tableHeaderRow}>
                   <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>NAVIGATOR NAME</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>MOBILE NO.</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>ACTIONS</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>ACTIONS</Text>
                 </View>
                 {navigators.map((navigator) => (
                   <NavigatorCard
                     key={String(navigator.id)}
                     navigator={navigator}
                     onEdit={handleOpenEditNavigator}
-                    onRemove={handleRemoveNavigator}
                   />
                 ))}
               </View>
