@@ -34,6 +34,7 @@ export const ENDPOINTS = {
     LIST: '/vehicle/list',
     GET: '/vehicle/get',
     DETAIL: (id: string | number) => `/vehicle/detail/${id}`,
+    DELETE: '/vehicle/delete',
   },
   SEARCH: {
     DRIVERS: '/drivers/search',

@@ -419,4 +419,44 @@ export const vehicleService = {
       return [];
     }
   },
+
+  /**
+   * POST /vehicle/delete
+   * Delete vehicle profile by ID
+   */
+  deleteVehicle: async (
+    id: string | number,
+    userId?: string | number
+  ): Promise<{ success: boolean; message?: string }> => {
+    const userKey = getUserVehicleStorageKey(userId);
+    let apiMessage = '';
+
+    try {
+      const payloadId = typeof id === 'number' ? id : isNaN(Number(id)) ? id : Number(id);
+      const response = await client.post(ENDPOINTS.VEHICLE.DELETE, {
+        id: payloadId,
+      });
+      const data = response.data;
+      if (data) {
+        apiMessage = data.message || 'Vehicle deleted successfully';
+      }
+    } catch (err: any) {
+      console.warn('[vehicleService] Remote delete notice:', err?.response?.data || err?.message || err);
+      apiMessage = err?.response?.data?.message || err?.message || 'Delete processed';
+    }
+
+    // Remove deleted vehicle from local user-scoped storage
+    try {
+      const existing = await vehicleService.getVehicles(userId);
+      const filtered = existing.filter((v) => String(v.id) !== String(id));
+      await AsyncStorage.setItem(userKey, JSON.stringify(filtered));
+    } catch (e) {
+      console.warn('[vehicleService] Local delete write warning:', e);
+    }
+
+    return {
+      success: true,
+      message: apiMessage || 'Vehicle deleted successfully',
+    };
+  },
 };

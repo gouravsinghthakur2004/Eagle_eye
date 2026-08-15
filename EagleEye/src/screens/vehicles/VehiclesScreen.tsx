@@ -16,9 +16,11 @@ import { useAppNavigation } from '@/context/NavigationContext';
 import { VehicleProfile } from '@/types';
 import { vehicleService } from '@/services/vehicleService';
 import { VehicleWizard } from '@/components/common/VehicleWizard';
+import { useNotification } from '@/hooks/useNotification';
 
 export const VehiclesScreen: React.FC = () => {
   const { user } = useAppNavigation();
+  const { showSuccess, showConfirm } = useNotification();
   const userId = user?.id;
 
   const [vehicles, setVehicles] = useState<VehicleProfile[]>([]);
@@ -66,6 +68,28 @@ export const VehiclesScreen: React.FC = () => {
     setSelectedVehicleToEdit(vehicle);
     setWizardMode('edit');
     setIsWizardOpen(true);
+  };
+
+  const handleRemoveVehicle = (vehicleId: string | number) => {
+    showConfirm({
+      title: 'Delete Vehicle?',
+      message: 'Are you sure you want to delete this vehicle profile?',
+      icon: '🏎️',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          const res = await vehicleService.deleteVehicle(vehicleId, userId);
+          if (res.success) {
+            showSuccess('Vehicle Deleted', res.message || 'Vehicle deleted successfully');
+            fetchVehicles();
+          }
+        } catch (err) {
+          console.warn('[VehiclesScreen] Remove error:', err);
+        }
+      },
+    });
   };
 
   const handleWizardClose = () => {
@@ -184,6 +208,12 @@ export const VehiclesScreen: React.FC = () => {
                           onPress={() => handleOpenEditVehicle(v)}
                         >
                           <Text style={styles.editBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.removeBtn}
+                          onPress={() => v.id && handleRemoveVehicle(v.id)}
+                        >
+                          <Text style={styles.removeBtnText}>✕</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -508,10 +538,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   actionCol: {
-    flex: 1.2,
+    flex: 1.4,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: 6,
   },
   editBtn: {
     backgroundColor: 'rgba(255, 122, 0, 0.15)',
@@ -523,6 +554,21 @@ const styles = StyleSheet.create({
   },
   editBtnText: {
     color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  removeBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeBtnText: {
+    color: '#EF4444',
     fontSize: 11,
     fontWeight: '800',
   },
