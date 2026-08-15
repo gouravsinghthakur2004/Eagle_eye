@@ -11,144 +11,109 @@ interface NavigatorCardProps {
 
 export const NavigatorCard: React.FC<NavigatorCardProps> = ({ navigator, onEdit, onRemove }) => {
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.cardHeader}>
-        <View style={styles.badgeRow}>
-          <Text style={styles.roleIcon}>🗺️</Text>
-          <Text style={styles.roleTitle}>NAVIGATOR</Text>
-        </View>
-        <View style={styles.actionGroup}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(navigator)}>
-            <Text style={styles.editBtnText}>✏️ Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.removeBtn}
-            onPress={() => navigator.id && onRemove(navigator.id)}
-          >
-            <Text style={styles.removeBtnText}>🗑️ Remove</Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.tableRow}>
+      {/* Navigator Name Column */}
+      <View style={styles.nameCol}>
+        <Text style={styles.navigatorName} numberOfLines={1}>
+          {navigator.full_name || 'Unnamed Navigator'}
+        </Text>
+        {Boolean(navigator.race_nick_name) && (
+          <Text style={styles.nicknameText} numberOfLines={1}>
+            "{navigator.race_nick_name}"
+          </Text>
+        )}
       </View>
 
-      <Text style={styles.navigatorName}>{navigator.full_name || 'Unnamed Navigator'}</Text>
-      {Boolean(navigator.race_nick_name) && (
-        <Text style={styles.nicknameText}>"{navigator.race_nick_name}"</Text>
-      )}
+      {/* Mobile No Column */}
+      <View style={styles.mobileCol}>
+        <Text style={styles.mobileText} numberOfLines={1}>
+          {navigator.mobile_no || 'N/A'}
+        </Text>
+      </View>
 
-      <View style={styles.infoRowGrid}>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>MOBILE</Text>
-          <Text style={styles.infoValue}>{navigator.mobile_no || 'N/A'}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>EMAIL</Text>
-          <Text style={styles.infoValue} numberOfLines={1}>
-            {navigator.email || 'N/A'}
-          </Text>
-        </View>
+      {/* Actions Column */}
+      <View style={styles.actionCol}>
+        <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(navigator)}>
+          <Text style={styles.editBtnText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.removeBtn}
+          onPress={() => navigator.id && onRemove(navigator.id)}
+        >
+          <Text style={styles.removeBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
   },
-  cardHeader: {
+  nameCol: {
+    flex: 2.2,
+    paddingRight: 6,
+  },
+  navigatorName: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  nicknameText: {
+    color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  mobileCol: {
+    flex: 1.8,
+    paddingRight: 6,
+  },
+  mobileText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  actionCol: {
+    flex: 1.4,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  roleIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  roleTitle: {
-    color: '#60A5FA',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  actionGroup: {
-    flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   editBtn: {
-    backgroundColor: 'rgba(255, 122, 0, 0.12)',
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 122, 0, 0.3)',
+    borderColor: COLORS.primary,
   },
   editBtnText: {
     color: COLORS.accentOrange,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   removeBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    width: 28,
+    height: 28,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   removeBtnText: {
     color: '#EF4444',
     fontSize: 11,
-    fontWeight: '700',
-  },
-  navigatorName: {
-    color: COLORS.white,
-    fontSize: 17,
     fontWeight: '800',
-    marginTop: 4,
-  },
-  nicknameText: {
-    color: COLORS.accentOrange,
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  infoRowGrid: {
-    flexDirection: 'row',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
-    gap: 16,
-  },
-  infoItem: {
-    flex: 1,
-  },
-  infoLabel: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  infoValue: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

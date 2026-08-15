@@ -126,93 +126,77 @@ export const VehiclesScreen: React.FC = () => {
             /* EMPTY STATE: NO VEHICLE REGISTERED */
             <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>🏎️</Text>
-              <Text style={styles.emptyTitle}>NO VEHICLE REGISTERED</Text>
+              <Text style={styles.emptyTitle}>No vehicles added yet</Text>
               <Text style={styles.emptySubtitle}>
-                Your race vehicle hasn't been registered yet. Add your vehicle telemetry and specification profile.
+                Your race vehicle hasn't been registered yet. Tap below to add your vehicle profile.
               </Text>
 
               <TouchableOpacity
                 style={styles.registerBtn}
                 onPress={handleOpenAddVehicle}
               >
-                <Text style={styles.registerBtnText}>[ + REGISTER VEHICLE ]</Text>
+                <Text style={styles.registerBtnText}>+ Add Vehicle</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            /* EXISTING VEHICLES LIST DISPLAY */
+            /* EXISTING VEHICLES TABLE DISPLAY */
             <View style={styles.profileContainer}>
-              {vehicles.map((v, idx) => (
-                <View key={v.id || idx} style={{ marginBottom: 16 }}>
-                  {/* Hero Banner Card */}
-                  <View style={styles.heroCard}>
-                    <View style={styles.heroHeaderRow}>
-                      <View style={styles.heroBadge}>
-                        <Text style={styles.heroBadgeText}>VEHICLE #{idx + 1}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.editHeaderBtn}
-                        onPress={() => handleOpenEditVehicle(v)}
-                      >
-                        <Text style={styles.editHeaderBtnText}>[ EDIT ]</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.vehicleNickName}>
-                      {v.vehicle_nick_name || `Race Vehicle #${idx + 1}`}
-                    </Text>
-                    <Text style={styles.vehicleMakeModel}>
-                      {v.vehicle_manufacturing} {v.vehicle_model}
-                    </Text>
-                  </View>
-
-                  {/* Technical Specifications Grid */}
-                  <View style={[styles.sectionCard, { marginTop: 10 }]}>
-                    <Text style={styles.sectionTitle}>VEHICLE SPECS</Text>
-                    <View style={styles.gridContainer}>
-                      <View style={styles.gridItem}>
-                        <Text style={styles.gridLabel}>ENGINE CC</Text>
-                        <Text style={styles.gridVal}>{v.vehicle_cc ? `${v.vehicle_cc} CC` : 'N/A'}</Text>
-                      </View>
-                      <View style={styles.gridItem}>
-                        <Text style={styles.gridLabel}>TURBO</Text>
-                        <Text style={styles.gridVal}>{v.is_turbo || 'No'}</Text>
-                      </View>
-                      <View style={styles.gridItem}>
-                        <Text style={styles.gridLabel}>FUEL TYPE</Text>
-                        <Text style={styles.gridVal}>{v.fuel_type || 'N/A'}</Text>
-                      </View>
-                      <View style={styles.gridItem}>
-                        <Text style={styles.gridLabel}>DRIVE TYPE</Text>
-                        <Text style={styles.gridVal}>{v.drive_type || 'N/A'}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Registration Information */}
-                  <View style={[styles.sectionCard, { marginTop: 10 }]}>
-                    <Text style={styles.sectionTitle}>REGISTRATION & INSURANCE</Text>
-                    <View style={styles.dataRow}>
-                      <Text style={styles.dataLabel}>RC NO:</Text>
-                      <Text style={styles.dataVal}>{v.vehicle_rc_no || 'N/A'}</Text>
-                    </View>
-                    <View style={styles.dataRow}>
-                      <Text style={styles.dataLabel}>OWNER:</Text>
-                      <Text style={styles.dataVal}>{v.vehicle_owner_name || 'N/A'}</Text>
-                    </View>
-                    <View style={styles.dataRow}>
-                      <Text style={styles.dataLabel}>INSURANCE POLICY:</Text>
-                      <Text style={styles.dataVal}>{v.insurance_no || 'N/A'}</Text>
-                    </View>
-                  </View>
+              <View style={styles.tableCard}>
+                {/* Table Header */}
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>VEHICLE NAME</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>PLATE / RC NO.</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>ACTIONS</Text>
                 </View>
-              ))}
 
-              {/* Bottom Add/Edit Action Button */}
+                {/* Table Data Rows */}
+                {vehicles.map((v, idx) => {
+                  const vehicleName = v.vehicle_nick_name || `${v.vehicle_manufacturing || ''} ${v.vehicle_model || ''}`.trim() || `Vehicle #${idx + 1}`;
+                  const makeModelText = `${v.vehicle_manufacturing || ''} ${v.vehicle_model || ''}`.trim();
+
+                  return (
+                    <View key={v.id || idx} style={styles.tableDataRow}>
+                      {/* Vehicle Name Column */}
+                      <View style={styles.nameCol}>
+                        <Text style={styles.vehicleNameText} numberOfLines={1}>
+                          {vehicleName}
+                        </Text>
+                        {Boolean(makeModelText) && (
+                          <Text style={styles.makeModelText} numberOfLines={1}>
+                            {makeModelText}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Plate / RC No Column */}
+                      <View style={styles.plateCol}>
+                        <View style={styles.plateBadge}>
+                          <Text style={styles.plateText} numberOfLines={1}>
+                            {v.vehicle_rc_no || 'N/A'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Actions Column */}
+                      <View style={styles.actionCol}>
+                        <TouchableOpacity
+                          style={styles.editBtn}
+                          onPress={() => handleOpenEditVehicle(v)}
+                        >
+                          <Text style={styles.editBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Bottom Add Vehicle Action Button */}
               <TouchableOpacity
                 style={styles.bottomEditBtn}
                 onPress={handleOpenAddVehicle}
               >
-                <Text style={styles.bottomEditBtnText}>+ ADD NEW VEHICLE ➔</Text>
+                <Text style={styles.bottomEditBtnText}>+ Add Vehicle</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -442,16 +426,104 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   bottomEditBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
   },
   bottomEditBtnText: {
+    color: COLORS.primaryLight,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  tableCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111111',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
+  },
+  tableHeaderCell: {
+    color: COLORS.primaryLight,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  tableDataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
+    backgroundColor: COLORS.surface,
+  },
+  nameCol: {
+    flex: 2.2,
+    paddingRight: 6,
+  },
+  vehicleNameText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  makeModelText: {
+    color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  plateCol: {
+    flex: 1.8,
+    paddingRight: 6,
+  },
+  plateBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#111111',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  plateText: {
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  actionCol: {
+    flex: 1.2,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  editBtn: {
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  editBtnText: {
+    color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

@@ -197,20 +197,28 @@ export const TeamMembersScreen: React.FC = () => {
             {drivers.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyIcon}>🏎️</Text>
-                <Text style={styles.emptyText}>No Drivers Added Yet</Text>
+                <Text style={styles.emptyText}>No drivers added yet</Text>
                 <Text style={styles.emptySubtext}>
-                  Tap below to register your first team driver.
+                  Tap below to register your team driver.
                 </Text>
               </View>
             ) : (
-              drivers.map((driver) => (
-                <DriverCard
-                  key={String(driver.id)}
-                  driver={driver}
-                  onEdit={handleOpenEditDriver}
-                  onRemove={handleRemoveDriver}
-                />
-              ))
+              <View style={styles.tableCard}>
+                {/* Driver Table Header */}
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>DRIVER NAME</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>MOBILE NO.</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>ACTIONS</Text>
+                </View>
+                {drivers.map((driver) => (
+                  <DriverCard
+                    key={String(driver.id)}
+                    driver={driver}
+                    onEdit={handleOpenEditDriver}
+                    onRemove={handleRemoveDriver}
+                  />
+                ))}
+              </View>
             )}
 
             <TouchableOpacity style={styles.addMemberBtn} onPress={handleOpenAddDriver}>
@@ -230,20 +238,28 @@ export const TeamMembersScreen: React.FC = () => {
             {navigators.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyIcon}>🗺️</Text>
-                <Text style={styles.emptyText}>No Navigators Added Yet</Text>
+                <Text style={styles.emptyText}>No navigators added yet</Text>
                 <Text style={styles.emptySubtext}>
                   Tap below to register your team navigator.
                 </Text>
               </View>
             ) : (
-              navigators.map((navigator) => (
-                <NavigatorCard
-                  key={String(navigator.id)}
-                  navigator={navigator}
-                  onEdit={handleOpenEditNavigator}
-                  onRemove={handleRemoveNavigator}
-                />
-              ))
+              <View style={styles.tableCard}>
+                {/* Navigator Table Header */}
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>NAVIGATOR NAME</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>MOBILE NO.</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>ACTIONS</Text>
+                </View>
+                {navigators.map((navigator) => (
+                  <NavigatorCard
+                    key={String(navigator.id)}
+                    navigator={navigator}
+                    onEdit={handleOpenEditNavigator}
+                    onRemove={handleRemoveNavigator}
+                  />
+                ))}
+              </View>
             )}
 
             <TouchableOpacity style={styles.addMemberBtn} onPress={handleOpenAddNavigator}>
@@ -384,6 +400,29 @@ const styles = StyleSheet.create({
     color: COLORS.primaryLight,
     fontSize: 14,
     fontWeight: '800',
+  },
+  tableCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111111',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
+  },
+  tableHeaderCell: {
+    color: COLORS.primaryLight,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
 });
 
