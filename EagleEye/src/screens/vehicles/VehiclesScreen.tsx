@@ -25,6 +25,8 @@ export const VehiclesScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
+  const [wizardMode, setWizardMode] = useState<'add' | 'edit'>('add');
+  const [selectedVehicleToEdit, setSelectedVehicleToEdit] = useState<VehicleProfile | null>(null);
 
   const fetchVehicles = useCallback(async () => {
     if (!userId) {
@@ -54,8 +56,25 @@ export const VehiclesScreen: React.FC = () => {
     fetchVehicles();
   };
 
-  const handleWizardSuccess = () => {
+  const handleOpenAddVehicle = () => {
+    setSelectedVehicleToEdit(null);
+    setWizardMode('add');
+    setIsWizardOpen(true);
+  };
+
+  const handleOpenEditVehicle = (vehicle: VehicleProfile) => {
+    setSelectedVehicleToEdit(vehicle);
+    setWizardMode('edit');
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardClose = () => {
     setIsWizardOpen(false);
+    setSelectedVehicleToEdit(null);
+  };
+
+  const handleWizardSuccess = () => {
+    handleWizardClose();
     fetchVehicles();
   };
 
@@ -63,14 +82,15 @@ export const VehiclesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <Header
-          title={vehicles.length > 0 ? 'Manage Vehicles' : 'Register Vehicle'}
+          title={wizardMode === 'edit' ? 'Edit Vehicle' : 'Register Vehicle'}
           showBack
-          onBack={() => setIsWizardOpen(false)}
+          onBack={handleWizardClose}
         />
         <VehicleWizard
-          initialVehicles={vehicles}
+          mode={wizardMode}
+          initialVehicle={selectedVehicleToEdit}
           onSuccess={handleWizardSuccess}
-          onCancel={() => setIsWizardOpen(false)}
+          onCancel={handleWizardClose}
         />
       </SafeAreaView>
     );
@@ -113,7 +133,7 @@ export const VehiclesScreen: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.registerBtn}
-                onPress={() => setIsWizardOpen(true)}
+                onPress={handleOpenAddVehicle}
               >
                 <Text style={styles.registerBtnText}>[ + REGISTER VEHICLE ]</Text>
               </TouchableOpacity>
@@ -131,7 +151,7 @@ export const VehiclesScreen: React.FC = () => {
                       </View>
                       <TouchableOpacity
                         style={styles.editHeaderBtn}
-                        onPress={() => setIsWizardOpen(true)}
+                        onPress={() => handleOpenEditVehicle(v)}
                       >
                         <Text style={styles.editHeaderBtnText}>[ EDIT ]</Text>
                       </TouchableOpacity>
@@ -190,9 +210,9 @@ export const VehiclesScreen: React.FC = () => {
               {/* Bottom Add/Edit Action Button */}
               <TouchableOpacity
                 style={styles.bottomEditBtn}
-                onPress={() => setIsWizardOpen(true)}
+                onPress={handleOpenAddVehicle}
               >
-                <Text style={styles.bottomEditBtnText}>+ MANAGE / ADD VEHICLES ➔</Text>
+                <Text style={styles.bottomEditBtnText}>+ ADD NEW VEHICLE ➔</Text>
               </TouchableOpacity>
             </View>
           )}

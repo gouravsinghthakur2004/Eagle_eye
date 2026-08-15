@@ -29,6 +29,7 @@ interface VehicleEntry extends Partial<VehicleProfile> {
 }
 
 interface VehicleWizardProps {
+  mode?: 'add' | 'edit';
   initialVehicles?: VehicleProfile[];
   initialVehicle?: VehicleProfile | null;
   onSuccess?: () => void;
@@ -68,6 +69,7 @@ const createEmptyVehicle = (index: number): VehicleEntry => ({
 });
 
 export const VehicleWizard: React.FC<VehicleWizardProps> = ({
+  mode = 'add',
   initialVehicles,
   initialVehicle,
   onSuccess,
@@ -93,14 +95,14 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
 
   // Dynamic Multi-Entry Vehicles Array State
   const [vehicles, setVehicles] = useState<VehicleEntry[]>(() => {
-    if (initialVehicles && initialVehicles.length > 0) {
+    if (mode === 'edit' && initialVehicle) {
+      return [{ ...initialVehicle, tempId: initialVehicle.id ? String(initialVehicle.id) : 'vehicle_edit_0' }];
+    }
+    if (initialVehicles && initialVehicles.length > 0 && mode === 'edit') {
       return initialVehicles.map((v, i) => ({
         ...v,
         tempId: v.id ? String(v.id) : `vehicle_init_${i}`,
       }));
-    }
-    if (initialVehicle) {
-      return [{ ...initialVehicle, tempId: initialVehicle.id ? String(initialVehicle.id) : 'vehicle_init_0' }];
     }
     return [createEmptyVehicle(0)];
   });
@@ -119,32 +121,36 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
   const [uploadStatus, setUploadStatus] = useState<VehicleUploadProgressStatus | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Load Draft on Mount if no initialVehicles
+  // Synchronize and re-initialize form state whenever mode or initialVehicle prop changes
   useEffect(() => {
-    if (!initialVehicle && (!initialVehicles || initialVehicles.length === 0)) {
-      AsyncStorage.getItem(draftKey)
-        .then((stored) => {
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored);
-              if (parsed.vehicles && Array.isArray(parsed.vehicles)) {
-                setVehicles(parsed.vehicles);
-                if (parsed.currentStep) setCurrentStep(parsed.currentStep);
-                setDraftRestored(true);
-              }
-            } catch (e) {}
-          }
-        })
-        .catch(() => {});
+    setCurrentStep(1);
+    setFormErrors([]);
+    setSelectedFiles({});
+    setUploadStatus(null);
+    setIsSubmitting(false);
+
+    if (mode === 'edit' && initialVehicle) {
+      setVehicles([
+        {
+          ...initialVehicle,
+          tempId: initialVehicle.id ? String(initialVehicle.id) : 'vehicle_edit_0',
+        },
+      ]);
+      setDraftRestored(false);
+    } else {
+      // ADD mode: reset to completely fresh blank form
+      setVehicles([createEmptyVehicle(0)]);
+      setDraftRestored(false);
+      AsyncStorage.removeItem(draftKey).catch(() => {});
     }
-  }, [draftKey, initialVehicle, initialVehicles]);
+  }, [mode, initialVehicle, draftKey]);
 
   // Update field for a specific vehicle index
   const updateVehicleField = (index: number, field: keyof VehicleProfile, val: any) => {
     setVehicles((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: val };
-      if (!initialVehicle && (!initialVehicles || initialVehicles.length === 0)) {
+      if (mode === 'add') {
         AsyncStorage.setItem(
           draftKey,
           JSON.stringify({ vehicles: copy, currentStep })
