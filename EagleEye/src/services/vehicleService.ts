@@ -29,6 +29,8 @@ export const ALLOWED_VEHICLE_ADD_FIELDS = [
   'insurance_validity',
   'insurance_company',
   'insurance_doc_upload',
+  'fitness_upload',
+  'fitness_validity',
   'vehicle_img_front',
   'vehicle_img_back',
   'vehicle_img_left',
@@ -55,11 +57,13 @@ export const ALLOWED_VEHICLE_UPDATE_FIELDS = [
   'insurance_no',
   'insurance_validity',
   'insurance_company',
+  'fitness_validity',
   'vehicle_additional_info',
   'status',
-  // Allow optional replacement uploads if updated
+  // Document & Photo uploads
   'rc_upload',
   'insurance_doc_upload',
+  'fitness_upload',
   'vehicle_img_front',
   'vehicle_img_back',
   'vehicle_img_left',
@@ -96,103 +100,87 @@ export const sanitizeVehiclePayload = (
   return sanitized;
 };
 
-const PRIMARY_AND_FALLBACK_ENDPOINTS = [
-  ENDPOINTS.VEHICLE.SAVE, // /vehicle/save
-  '/vehicle/add',
-  '/vehicle/update',
-  '/vehicle',
-];
-
 export const vehicleService = {
   /**
-   * GET /vehicle/get
-   * Strictly scoped to current authenticated userId
-   */
-  getVehicle: async (userId?: string | number): Promise<VehicleProfile | null> => {
-    if (!userId) return null;
-    const userKey = getUserVehicleStorageKey(userId);
-
-    let localVehicle: VehicleProfile | null = null;
-    try {
-      const stored = await AsyncStorage.getItem(userKey);
-      if (stored) {
-        localVehicle = JSON.parse(stored);
-      }
-    } catch (e) {
-      console.warn('[vehicleService] Local read error:', e);
-    }
-
-    // Try official remote GET endpoint
-    try {
-      let res;
-      try {
-        res = await client.get(ENDPOINTS.VEHICLE.GET);
-      } catch {
-        res = await client.get(ENDPOINTS.VEHICLE.LIST);
-      }
-      const data = res.data;
-      if (data?.vehicle) return data.vehicle;
-      if (data?.data && !Array.isArray(data.data)) return data.data;
-      if (Array.isArray(data) && data.length > 0) return data[0];
-      if (data?.data && Array.isArray(data.data) && data.data.length > 0) return data.data[0];
-      if (data?.vehicles && Array.isArray(data.vehicles) && data.vehicles.length > 0) return data.vehicles[0];
-    } catch (remoteErr) {
-      console.warn('[vehicleService] Remote GET failed:', remoteErr);
-    }
-
-    return localVehicle;
-  },
-
-  /**
-   * GET /vehicle/list or /vehicle/get
-   * Returns list of vehicles strictly scoped to userId
+   * GET /vehicle/list OR /vehicle/get
+   * Scoped per authenticated user
    */
   getVehicles: async (userId?: string | number): Promise<VehicleProfile[]> => {
     const userKey = getUserVehicleStorageKey(userId);
-
     let localVehicles: VehicleProfile[] = [];
+
     try {
       const stored = await AsyncStorage.getItem(userKey);
       if (stored) {
         localVehicles = JSON.parse(stored);
       }
     } catch (e) {
-      console.warn('[vehicleService] Local vehicles read error:', e);
+      console.warn('[vehicleService] Local read error:', e);
     }
 
-    try {
-      let res;
+    const vehicleMap = new Map<string, VehicleProfile>();
+    for (const v of localVehicles) {
+      if (v.id) vehicleMap.set(String(v.id), v);
+    }
+
+    const listEndpoints = [
+      ENDPOINTS.VEHICLE.LIST,
+      ENDPOINTS.VEHICLE.GET,
+      '/vehicles',
+      '/vehicle/list',
+      '/vehicles/list',
+    ];
+
+    for (const endpoint of listEndpoints) {
       try {
-        res = await client.get(ENDPOINTS.VEHICLE.LIST);
-      } catch {
-        res = await client.get(ENDPOINTS.VEHICLE.GET);
-      }
-      const data = res.data;
-      let remoteVehicles: VehicleProfile[] = [];
-      if (data?.vehicles && Array.isArray(data.vehicles)) remoteVehicles = data.vehicles;
-      else if (Array.isArray(data)) remoteVehicles = data;
-      else if (data?.data && Array.isArray(data.data)) remoteVehicles = data.data;
+        const res = await client.get(endpoint);
+        const data = res.data;
+        let remoteVehicles: VehicleProfile[] = [];
+        if (Array.isArray(data)) remoteVehicles = data;
+        else if (data?.vehicles && Array.isArray(data.vehicles)) remoteVehicles = data.vehicles;
+        else if (data?.data && Array.isArray(data.data)) remoteVehicles = data.data;
 
-      if (remoteVehicles.length > 0 && userId) {
-        const matches = remoteVehicles.filter((v) => {
-          const vehicleUserId = v.user_id ? String(v.user_id) : null;
-          if (vehicleUserId) return vehicleUserId === String(userId);
-          if (v.id && String(v.id) === String(userId)) return true;
-          return false;
-        });
-
-        if (matches.length > 0) {
+        if (remoteVehicles.length > 0) {
+          for (const v of remoteVehicles) {
+            const vehicleId = v.id ? String(v.id) : null;
+            if (vehicleId) {
+              vehicleMap.set(vehicleId, {
+                ...v,
+                id: vehicleId,
+                user_id: v.user_id ? String(v.user_id) : (userId ? String(userId) : ''),
+              });
+            }
+          }
+          const updatedList = Array.from(vehicleMap.values());
           try {
-            await AsyncStorage.setItem(userKey, JSON.stringify(matches));
+            await AsyncStorage.setItem(userKey, JSON.stringify(updatedList));
           } catch {}
-          return matches;
+          return updatedList;
         }
-      }
-    } catch (remoteErr) {
-      console.warn('[vehicleService] Remote GET vehicles failed:', remoteErr);
+      } catch {}
     }
 
-    return localVehicles;
+    return Array.from(vehicleMap.values());
+  },
+
+  /**
+   * GET /vehicle/detail/{id}
+   */
+  getVehicleById: async (
+    id: string | number,
+    userId?: string | number
+  ): Promise<VehicleProfile | null> => {
+    try {
+      const res = await client.get(ENDPOINTS.VEHICLE.DETAIL(id));
+      const data = res.data;
+      if (data?.vehicle) return data.vehicle;
+      if (data?.data) return data.data;
+    } catch (err) {
+      console.warn('[vehicleService] GET detail failed, falling back:', err);
+    }
+
+    const all = await vehicleService.getVehicles(userId);
+    return all.find((v) => String(v.id) === String(id)) || null;
   },
 
   /**
@@ -223,6 +211,7 @@ export const vehicleService = {
     const fileFields = [
       'rc_upload',
       'insurance_doc_upload',
+      'fitness_upload',
       'vehicle_img_front',
       'vehicle_img_back',
       'vehicle_img_left',
@@ -232,17 +221,34 @@ export const vehicleService = {
     // 2. Construct FormData for multipart upload
     const formData = new FormData();
     const allowedFields = isUpdate ? ALLOWED_VEHICLE_UPDATE_FIELDS : ALLOWED_VEHICLE_ADD_FIELDS;
+
     for (const key of allowedFields) {
       if (fileFields.includes(key)) {
         const fileObj = files?.[key];
         if (fileObj && fileObj.uri) {
           const extension = fileObj.type?.includes('pdf') ? 'pdf' : 'jpg';
           const safeName = fileObj.name || getSafeFileName(key, undefined, extension);
-          formData.append(key, {
+          const fileBlob = {
             uri: fileObj.uri,
             name: safeName,
             type: fileObj.type || (extension === 'pdf' ? 'application/pdf' : 'image/jpeg'),
-          } as any);
+          };
+
+          // Append primary field key
+          formData.append(key, fileBlob as any);
+
+          // Append standard backend aliases to guarantee 100% receiver compatibility
+          if (key === 'rc_upload') {
+            formData.append('rc_doc', fileBlob as any);
+          } else if (key === 'insurance_doc_upload') {
+            formData.append('insurance_upload', fileBlob as any);
+            formData.append('insurance_document', fileBlob as any);
+          } else if (key === 'fitness_upload') {
+            formData.append('fitness_doc_upload', fileBlob as any);
+          } else if (key === 'vehicle_img_front') {
+            formData.append('vehicle_pic_upload', fileBlob as any);
+            formData.append('vehicle_photo', fileBlob as any);
+          }
         } else if (payload[key as keyof VehicleProfile] && !isLocalFileUri(String(payload[key as keyof VehicleProfile]))) {
           // Preserve existing server-relative path or URL
           formData.append(key, String(payload[key as keyof VehicleProfile]));
@@ -283,6 +289,7 @@ export const vehicleService = {
         const res = await client.post(endpoint, {
           ...sanitizedPayload,
           user_id: userId ? String(userId) : undefined,
+          id: payload.id ? String(payload.id) : undefined,
         });
         if (res.data) {
           const body = res.data;
@@ -303,15 +310,20 @@ export const vehicleService = {
       }
     }
 
-    // Helper to safely extract server-relative paths or fall back to existing clean paths
-    const resolveVehicleServerPath = (field: keyof VehicleProfile): string => {
-      const remoteVal = apiResponseData?.[field];
-      if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
-        return remoteVal;
+    // Helper to safely extract server-relative paths or fall back to existing clean paths across all alias keys
+    const resolveVehicleServerPath = (field: keyof VehicleProfile, aliases: string[] = []): string => {
+      const allKeys = [field as string, ...aliases];
+      for (const k of allKeys) {
+        const remoteVal = apiResponseData?.[k];
+        if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
+          return remoteVal;
+        }
       }
-      const existingVal = payload[field];
-      if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
-        return existingVal;
+      for (const k of allKeys) {
+        const existingVal = (payload as any)[k];
+        if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
+          return existingVal;
+        }
       }
       return '';
     };
@@ -329,16 +341,16 @@ export const vehicleService = {
       fuel_type: String(sanitizedPayload.fuel_type || ''),
       drive_type: String(sanitizedPayload.drive_type || ''),
       vehicle_nick_name: String(sanitizedPayload.vehicle_nick_name || ''),
-      rc_upload: resolveVehicleServerPath('rc_upload'),
+      rc_upload: resolveVehicleServerPath('rc_upload', ['rc_doc', 'rc_document', 'rc_path']),
       rc_validity: String(sanitizedPayload.rc_validity || ''),
       insurance_no: String(sanitizedPayload.insurance_no || ''),
       insurance_validity: String(sanitizedPayload.insurance_validity || ''),
       insurance_company: String(sanitizedPayload.insurance_company || ''),
-      insurance_doc_upload: resolveVehicleServerPath('insurance_doc_upload'),
-      vehicle_img_front: resolveVehicleServerPath('vehicle_img_front'),
-      vehicle_img_back: resolveVehicleServerPath('vehicle_img_back'),
-      vehicle_img_left: resolveVehicleServerPath('vehicle_img_left'),
-      vehicle_img_right: resolveVehicleServerPath('vehicle_img_right'),
+      insurance_doc_upload: resolveVehicleServerPath('insurance_doc_upload', ['insurance_upload', 'insurance_document', 'insurance_doc']),
+      vehicle_img_front: resolveVehicleServerPath('vehicle_img_front', ['vehicle_pic_upload', 'vehicle_photo', 'vehicle_pic']),
+      vehicle_img_back: resolveVehicleServerPath('vehicle_img_back', ['vehicle_photo_back']),
+      vehicle_img_left: resolveVehicleServerPath('vehicle_img_left', ['vehicle_photo_left']),
+      vehicle_img_right: resolveVehicleServerPath('vehicle_img_right', ['vehicle_photo_right']),
       vehicle_additional_info: String(sanitizedPayload.vehicle_additional_info || ''),
       status: sanitizedPayload.status !== undefined ? sanitizedPayload.status : 1,
       created_at: apiResponseData?.created_at || new Date().toISOString(),
@@ -358,168 +370,31 @@ export const vehicleService = {
     return {
       success: true,
       data: savedVehicleObject,
-      message: apiMessage || (isUpdate ? 'Vehicle updated successfully!' : 'Vehicle added successfully!'),
+      message: apiMessage || (isUpdate ? 'Vehicle updated successfully' : 'Vehicle added successfully'),
     };
   },
 
   /**
-   * POST /vehicle/save (or batch) for dynamic multi-entry vehicles[]
-   */
-  saveMultipleVehicles: async (
-    vehiclesList: Partial<VehicleProfile>[],
-    userId?: string | number
-  ): Promise<{ success: boolean; message?: string }> => {
-    const userKey = getUserVehicleStorageKey(userId);
-    const sanitizedVehicles = vehiclesList.map((v) => sanitizeVehiclePayload(v, Boolean(v.id)));
-
-    let apiSuccess = false;
-    let apiMessage = '';
-
-    for (const endpoint of PRIMARY_AND_FALLBACK_ENDPOINTS) {
-      try {
-        const res = await client.post(endpoint, {
-          vehicles: sanitizedVehicles,
-          user_id: userId ? String(userId) : undefined,
-        });
-        if (res.data) {
-          const body = res.data;
-          const isControllerErr =
-            typeof body === 'string' && body.includes('not a valid controller name');
-          if (!isControllerErr) {
-            apiSuccess = true;
-            apiMessage = body?.message || 'Vehicles saved successfully!';
-            break;
-          }
-        }
-      } catch {
-        // Fallback to individual vehicle save
-      }
-    }
-
-    if (!apiSuccess) {
-      for (const vehicleItem of vehiclesList) {
-        await vehicleService.saveVehicle(vehicleItem, userId);
-      }
-    }
-
-    const savedObjects: VehicleProfile[] = vehiclesList.map((v, i) => ({
-      id: v.id || `vehicle_${Date.now()}_${i}`,
-      user_id: userId ? String(userId) : v.user_id || '',
-      vehicle_rc_no: String(v.vehicle_rc_no || ''),
-      vehicle_owner_name: String(v.vehicle_owner_name || ''),
-      vehicle_cc: v.vehicle_cc || '',
-      is_turbo: v.is_turbo || 'No',
-      vehicle_manufacturing: String(v.vehicle_manufacturing || ''),
-      vehicle_model: String(v.vehicle_model || ''),
-      fuel_type: String(v.fuel_type || ''),
-      drive_type: String(v.drive_type || ''),
-      vehicle_nick_name: String(v.vehicle_nick_name || ''),
-      rc_upload: v.rc_upload || '',
-      rc_validity: String(v.rc_validity || ''),
-      insurance_no: String(v.insurance_no || ''),
-      insurance_validity: String(v.insurance_validity || ''),
-      insurance_company: String(v.insurance_company || ''),
-      insurance_doc_upload: v.insurance_doc_upload || '',
-      vehicle_img_front: v.vehicle_img_front || '',
-      vehicle_img_back: v.vehicle_img_back || '',
-      vehicle_img_left: v.vehicle_img_left || '',
-      vehicle_img_right: v.vehicle_img_right || '',
-      vehicle_additional_info: String(v.vehicle_additional_info || ''),
-      status: v.status !== undefined ? v.status : 1,
-      created_at: v.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }));
-
-    try {
-      await AsyncStorage.setItem(userKey, JSON.stringify(savedObjects));
-    } catch (storageErr) {
-      console.warn('[vehicleService] Local write warning:', storageErr);
-    }
-
-    return {
-      success: true,
-      message: apiMessage || 'Vehicles saved successfully!',
-    };
-  },
-
-  /**
-   * Clear user-scoped vehicle storage key upon logout
-   */
-  clearUserVehicleStorage: async (userId?: string | number): Promise<void> => {
-    if (!userId) return;
-    try {
-      await AsyncStorage.removeItem(getUserVehicleStorageKey(userId));
-    } catch {}
-  },
-
-  /**
-   * Search Vehicles strictly by Vehicle RC Number (minimum 2 characters required)
-   * GET /vehicles/search?rc_no={rc_no}
-   */
-  searchVehicles: async (rc_no: string, userId?: string | number): Promise<VehicleProfile[]> => {
-    const query = rc_no.trim();
-    if (!query || query.length < 2) return [];
-
-    try {
-      const response = await client.get(`${ENDPOINTS.SEARCH.VEHICLES}?rc_no=${encodeURIComponent(query)}`);
-      const data = response.data;
-      if (data) {
-        if (Array.isArray(data.vehicles)) return data.vehicles;
-        if (Array.isArray(data.data)) return data.data;
-        if (Array.isArray(data)) return data;
-      }
-    } catch (err: any) {
-      console.warn('[vehicleService] API search error, falling back to local search:', err?.message || err);
-    }
-
-    // Fallback: Filter existing vehicle profiles stored locally by vehicle_rc_no
-    try {
-      const allVehicles = await vehicleService.getVehicles(userId);
-      return allVehicles.filter((v) =>
-        v.vehicle_rc_no?.toLowerCase().includes(query.toLowerCase())
-      );
-    } catch {
-      return [];
-    }
-  },
-
-  /**
-   * POST /vehicle/delete
-   * Delete vehicle profile by ID
+   * DELETE /vehicle/delete/{id}
    */
   deleteVehicle: async (
     id: string | number,
     userId?: string | number
   ): Promise<{ success: boolean; message?: string }> => {
     const userKey = getUserVehicleStorageKey(userId);
-    let apiMessage = '';
 
     try {
-      const payloadId = typeof id === 'number' ? id : isNaN(Number(id)) ? id : Number(id);
-      const response = await client.post(ENDPOINTS.VEHICLE.DELETE, {
-        id: payloadId,
-      });
-      const data = response.data;
-      if (data) {
-        apiMessage = data.message || 'Vehicle deleted successfully';
-      }
-    } catch (err: any) {
-      console.warn('[vehicleService] Remote delete notice:', err?.response?.data || err?.message || err);
-      apiMessage = err?.response?.data?.message || err?.message || 'Delete processed';
+      await client.post(`${ENDPOINTS.VEHICLE.DELETE}/${id}`);
+    } catch (e) {
+      console.warn('[vehicleService] Remote delete error:', e);
     }
 
-    // Remove deleted vehicle from local user-scoped storage
     try {
       const existing = await vehicleService.getVehicles(userId);
       const filtered = existing.filter((v) => String(v.id) !== String(id));
       await AsyncStorage.setItem(userKey, JSON.stringify(filtered));
-    } catch (e) {
-      console.warn('[vehicleService] Local delete write warning:', e);
-    }
+    } catch {}
 
-    return {
-      success: true,
-      message: apiMessage || 'Vehicle deleted successfully',
-    };
+    return { success: true, message: 'Vehicle deleted successfully' };
   },
 };

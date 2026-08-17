@@ -224,11 +224,28 @@ export const driverNavigatorService = {
         if (fileObj && fileObj.uri) {
           const extension = fileObj.type?.includes('pdf') ? 'pdf' : 'jpg';
           const safeName = fileObj.name || getSafeFileName(key, undefined, extension);
-          formData.append(key, {
+          const fileBlob = {
             uri: fileObj.uri,
             name: safeName,
             type: fileObj.type || (extension === 'pdf' ? 'application/pdf' : 'image/jpeg'),
-          } as any);
+          };
+
+          formData.append(key, fileBlob as any);
+
+          // Append aliases for maximum backend controller compatibility
+          if (key === 'driver_pic_upload') {
+            formData.append('driver_pic', fileBlob as any);
+            formData.append('profile_pic_upload', fileBlob as any);
+            formData.append('photo', fileBlob as any);
+          } else if (key === 'dl_upload') {
+            formData.append('dl_doc', fileBlob as any);
+            formData.append('dl_document', fileBlob as any);
+            formData.append('license_upload', fileBlob as any);
+          } else if (key === 'insurance_document') {
+            formData.append('insurance_doc_upload', fileBlob as any);
+            formData.append('insurance_upload', fileBlob as any);
+            formData.append('insurance_doc', fileBlob as any);
+          }
         } else if (payload[key] && !isLocalFileUri(String(payload[key]))) {
           // Preserve existing server-relative path or URL
           formData.append(key, String(payload[key]));
@@ -290,15 +307,20 @@ export const driverNavigatorService = {
       }
     }
 
-    // Helper to safely extract server-relative paths or fall back to existing clean paths
-    const resolveServerPath = (field: 'driver_pic_upload' | 'dl_upload' | 'insurance_document'): string => {
-      const remoteVal = apiResponseData?.[field];
-      if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
-        return remoteVal;
+    // Helper to safely extract server-relative paths or fall back to existing clean paths across all alias keys
+    const resolveServerPath = (field: 'driver_pic_upload' | 'dl_upload' | 'insurance_document', aliases: string[] = []): string => {
+      const allKeys = [field as string, ...aliases];
+      for (const k of allKeys) {
+        const remoteVal = apiResponseData?.[k];
+        if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
+          return remoteVal;
+        }
       }
-      const existingVal = payload[field];
-      if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
-        return existingVal;
+      for (const k of allKeys) {
+        const existingVal = (payload as any)[k];
+        if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
+          return existingVal;
+        }
       }
       return '';
     };
@@ -319,8 +341,8 @@ export const driverNavigatorService = {
       email: sanitizedPayload.email,
       dl_no: sanitizedPayload.dl_no,
       dl_validity: sanitizedPayload.dl_validity,
-      dl_upload: resolveServerPath('dl_upload'),
-      driver_pic_upload: resolveServerPath('driver_pic_upload'),
+      dl_upload: resolveServerPath('dl_upload', ['dl_doc', 'dl_document', 'license_upload']),
+      driver_pic_upload: resolveServerPath('driver_pic_upload', ['driver_pic', 'profile_pic_upload', 'photo']),
       instagram_handle: sanitizedPayload.instagram_handle,
       emergency_contact_name: sanitizedPayload.emergency_contact_name,
       emergency_contact_no: sanitizedPayload.emergency_contact_no,
@@ -328,7 +350,7 @@ export const driverNavigatorService = {
       t_shirt_size: sanitizedPayload.t_shirt_size,
       asn_fmn_lic: sanitizedPayload.asn_fmn_lic,
       insurance_no: sanitizedPayload.insurance_no,
-      insurance_document: resolveServerPath('insurance_document'),
+      insurance_document: resolveServerPath('insurance_document', ['insurance_doc_upload', 'insurance_upload', 'insurance_doc']),
       insurance_validity: sanitizedPayload.insurance_validity,
       medical_condition: sanitizedPayload.medical_condition,
       approval_status: apiResponseData?.approval_status || '0',

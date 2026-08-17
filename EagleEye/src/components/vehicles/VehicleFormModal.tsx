@@ -69,6 +69,8 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
     insurance_company: '',
     insurance_validity: '',
     insurance_doc_upload: '',
+    fitness_upload: '',
+    fitness_validity: '',
     vehicle_img_front: '',
     vehicle_img_back: '',
     vehicle_img_left: '',
@@ -82,6 +84,7 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
       Record<
         | 'rc_upload'
         | 'insurance_doc_upload'
+        | 'fitness_upload'
         | 'vehicle_img_front'
         | 'vehicle_img_back'
         | 'vehicle_img_left'
@@ -128,6 +131,8 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
           insurance_company: initialValues.insurance_company || '',
           insurance_validity: initialValues.insurance_validity || '',
           insurance_doc_upload: initialValues.insurance_doc_upload || '',
+          fitness_upload: (initialValues as any).fitness_upload || '',
+          fitness_validity: (initialValues as any).fitness_validity || '',
           vehicle_img_front: initialValues.vehicle_img_front || '',
           vehicle_img_back: initialValues.vehicle_img_back || '',
           vehicle_img_left: initialValues.vehicle_img_left || '',
@@ -152,6 +157,8 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
           insurance_company: '',
           insurance_validity: '',
           insurance_doc_upload: '',
+          fitness_upload: '',
+          fitness_validity: '',
           vehicle_img_front: '',
           vehicle_img_back: '',
           vehicle_img_left: '',
@@ -163,7 +170,7 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
     }
   }, [visible, initialValues]);
 
-  const handleChange = (key: keyof VehicleProfile, value: any) => {
+  const handleChange = (key: keyof VehicleProfile | 'fitness_upload' | 'fitness_validity', value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     if (fieldErrors[key]) {
       setFieldErrors((prev) => {
@@ -178,6 +185,7 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
     fieldKey:
       | 'rc_upload'
       | 'insurance_doc_upload'
+      | 'fitness_upload'
       | 'vehicle_img_front'
       | 'vehicle_img_back'
       | 'vehicle_img_left'
@@ -567,6 +575,23 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
                   value={formData.insurance_doc_upload}
                   onFileSelected={(fileObj) => handleFileChange('insurance_doc_upload', fileObj)}
                   icon="📄"
+                />
+
+                <FileUploadInput
+                  label="Vehicle Fitness Certificate (PDF / Image)"
+                  value={(formData as any).fitness_upload}
+                  onFileSelected={(fileObj) => handleFileChange('fitness_upload', fileObj)}
+                  icon="📄"
+                />
+
+                <DatePickerInput
+                  label="Fitness Validity Date"
+                  value={(formData as any).fitness_validity || ''}
+                  onChangeDate={(val) => handleChange('fitness_validity', val)}
+                  icon="📅"
+                  placeholder="Select Fitness Expiry Date"
+                  minYear={2020}
+                  maxYear={2045}
                 />
               </View>
             )}

@@ -149,6 +149,8 @@ export interface VehicleProfile {
   insurance_validity: string;
   insurance_company: string;
   insurance_doc_upload?: string;
+  fitness_upload?: string;
+  fitness_validity?: string;
   vehicle_img_front?: string;
   vehicle_img_back?: string;
   vehicle_img_left?: string;
