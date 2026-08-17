@@ -50,6 +50,7 @@ export const vehicleUploadQueue = {
       let completedSteps = 0;
 
       const finalPayload: Partial<VehicleProfile> = { ...vehicleData };
+      const optimizedFilesMap: Partial<Record<VehicleUploadFieldKey, SelectedFile>> = {};
 
       // 1. Process & Compress files
       for (const key of pendingKeys) {
@@ -69,8 +70,8 @@ export const vehicleUploadQueue = {
           // Compress image files, leave PDF documents untouched
           const { file: optimizedFile } = await fileCompression.compressImageIfNeeded(fileObj);
 
-          // Store URI string on payload for exact API compatibility
-          finalPayload[key] = optimizedFile.uri;
+          // Store optimized file object for multipart upload (NEVER local device URI string)
+          optimizedFilesMap[key] = optimizedFile;
 
           completedSteps++;
           if (onProgress) {
@@ -84,7 +85,7 @@ export const vehicleUploadQueue = {
         }
       }
 
-      // 2. Finalize submission via service
+      // 2. Finalize submission via service with multipart files
       if (onProgress) {
         onProgress({
           stepName: 'Finalizing vehicle submission…',
@@ -93,7 +94,7 @@ export const vehicleUploadQueue = {
         });
       }
 
-      const result = await vehicleService.saveVehicle(finalPayload, userId);
+      const result = await vehicleService.saveVehicle(finalPayload, userId, optimizedFilesMap);
 
       if (onProgress) {
         onProgress({

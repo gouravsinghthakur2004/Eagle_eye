@@ -6,6 +6,7 @@ export * from './dateFormatter';
 export * from './responsive';
 export * from './eventLifecycle';
 export * from './formValidation';
+export * from './fileUrl';
 
 export const truncateText = (text: string, maxLength: number = 30): string => {
   if (!text || text.length <= maxLength) return text;

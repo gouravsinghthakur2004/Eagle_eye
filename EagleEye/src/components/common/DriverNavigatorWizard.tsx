@@ -349,7 +349,9 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
         isUploading: true,
       });
 
-      // Compress all attached files
+      // Compress all attached files and prepare filesMap
+      const optimizedFilesMap: Record<string, SelectedFile> = {};
+
       const processedDrivers = await Promise.all(
         drivers.map(async (driver) => {
           const dCopy = { ...driver };
@@ -359,15 +361,18 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
 
           if (selectedFiles[picKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[picKey]);
-            dCopy.driver_pic_upload = res.file.uri;
+            optimizedFilesMap[picKey] = res.file;
+            dCopy.driver_pic_upload = '';
           }
           if (selectedFiles[dlKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[dlKey]);
-            dCopy.dl_upload = res.file.uri;
+            optimizedFilesMap[dlKey] = res.file;
+            dCopy.dl_upload = '';
           }
           if (selectedFiles[insKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[insKey]);
-            dCopy.insurance_document = res.file.uri;
+            optimizedFilesMap[insKey] = res.file;
+            dCopy.insurance_document = '';
           }
           return dCopy;
         })
@@ -382,15 +387,18 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
 
           if (selectedFiles[picKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[picKey]);
-            nCopy.driver_pic_upload = res.file.uri;
+            optimizedFilesMap[picKey] = res.file;
+            nCopy.driver_pic_upload = '';
           }
           if (selectedFiles[dlKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[dlKey]);
-            nCopy.dl_upload = res.file.uri;
+            optimizedFilesMap[dlKey] = res.file;
+            nCopy.dl_upload = '';
           }
           if (selectedFiles[insKey]) {
             const res = await fileCompression.compressImageIfNeeded(selectedFiles[insKey]);
-            nCopy.insurance_document = res.file.uri;
+            optimizedFilesMap[insKey] = res.file;
+            nCopy.insurance_document = '';
           }
           return nCopy;
         })
@@ -406,7 +414,8 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
       await onSubmit({
         drivers: processedDrivers,
         navigators: processedNavigators,
-      });
+        filesMap: optimizedFilesMap,
+      } as any);
 
       setUploadStatus(null);
     } catch (err: any) {

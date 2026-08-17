@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { VehicleProfile } from '@/types';
+import { SelectedFile } from '@/utils/fileValidation';
+import { isLocalFileUri, getSafeFileName } from '@/utils/fileUrl';
 
 const getUserVehicleStorageKey = (userId?: string | number): string => {
   if (!userId) return '@eagleeye_vehicle_profile_guest';
@@ -66,6 +68,7 @@ export const ALLOWED_VEHICLE_UPDATE_FIELDS = [
 
 /**
  * Strict Payload Sanitizer: Guarantees ONLY allowed Vehicle API fields exist in request
+ * and strips out local client-side filesystem URIs (file://, C:\...) from text JSON.
  */
 export const sanitizeVehiclePayload = (
   raw: Partial<VehicleProfile>,
@@ -77,10 +80,13 @@ export const sanitizeVehiclePayload = (
   for (const field of allowedFields) {
     const val = raw[field as keyof VehicleProfile];
     if (val !== undefined && val !== null) {
-      if (field === 'vehicle_cc' || field === 'status' || field === 'id') {
+      const strVal = String(val);
+      if (isLocalFileUri(strVal)) {
+        sanitized[field] = '';
+      } else if (field === 'vehicle_cc' || field === 'status' || field === 'id') {
         sanitized[field] = typeof val === 'number' ? val : isNaN(Number(val)) ? String(val) : Number(val);
       } else {
-        sanitized[field] = String(val);
+        sanitized[field] = strVal;
       }
     } else {
       sanitized[field] = field === 'status' ? 1 : '';
@@ -118,59 +124,40 @@ export const vehicleService = {
 
     // Try official remote GET endpoint
     try {
-      const res = await client.get(ENDPOINTS.VEHICLE.GET);
-      const data = res.data;
-      let remoteVehicles: VehicleProfile[] = [];
-      if (Array.isArray(data)) remoteVehicles = data;
-      else if (data?.vehicles && Array.isArray(data.vehicles)) remoteVehicles = data.vehicles;
-      else if (data?.data && Array.isArray(data.data)) remoteVehicles = data.data;
-      else if (data?.vehicle && typeof data.vehicle === 'object') remoteVehicles = [data.vehicle];
-
-      if (remoteVehicles.length > 0 && userId) {
-        const match = remoteVehicles.find((v) => {
-          const vehicleUserId = v.user_id ? String(v.user_id) : null;
-          if (vehicleUserId) return vehicleUserId === String(userId);
-          if (v.id && String(v.id) === String(userId)) return true;
-          return false;
-        });
-
-        if (match) {
-          try {
-            await AsyncStorage.setItem(userKey, JSON.stringify(match));
-          } catch {}
-          return match;
-        } else {
-          // No vehicle for current userId -> clear local cache and return null
-          try {
-            await AsyncStorage.removeItem(userKey);
-          } catch {}
-          return null;
-        }
+      let res;
+      try {
+        res = await client.get(ENDPOINTS.VEHICLE.GET);
+      } catch {
+        res = await client.get(ENDPOINTS.VEHICLE.LIST);
       }
+      const data = res.data;
+      if (data?.vehicle) return data.vehicle;
+      if (data?.data && !Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data) && data.length > 0) return data[0];
+      if (data?.data && Array.isArray(data.data) && data.data.length > 0) return data.data[0];
+      if (data?.vehicles && Array.isArray(data.vehicles) && data.vehicles.length > 0) return data.vehicles[0];
     } catch (remoteErr) {
-      console.warn('[vehicleService] Remote GET skipped/failed, using user-scoped local storage:', remoteErr);
+      console.warn('[vehicleService] Remote GET failed:', remoteErr);
     }
 
     return localVehicle;
   },
 
   /**
-   * GET /vehicle/get - returns list of vehicles for current userId
+   * GET /vehicle/list or /vehicle/get
+   * Returns list of vehicles strictly scoped to userId
    */
   getVehicles: async (userId?: string | number): Promise<VehicleProfile[]> => {
-    if (!userId) return [];
     const userKey = getUserVehicleStorageKey(userId);
 
     let localVehicles: VehicleProfile[] = [];
     try {
       const stored = await AsyncStorage.getItem(userKey);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) localVehicles = parsed;
-        else if (typeof parsed === 'object') localVehicles = [parsed];
+        localVehicles = JSON.parse(stored);
       }
     } catch (e) {
-      console.warn('[vehicleService] Local list read error:', e);
+      console.warn('[vehicleService] Local vehicles read error:', e);
     }
 
     try {
@@ -210,11 +197,13 @@ export const vehicleService = {
 
   /**
    * POST /vehicle/save
-   * Enforces 100% strict payload field sanitization and attaches userId.
+   * Implements complete multipart FormData upload for vehicle documents and images.
+   * Ensures the database stores ONLY server-relative paths and NEVER client filesystem paths.
    */
   saveVehicle: async (
     payload: Partial<VehicleProfile>,
-    userId?: string | number
+    userId?: string | number,
+    files?: Partial<Record<string, SelectedFile>>
   ): Promise<{ success: boolean; data?: VehicleProfile; message?: string }> => {
     const isUpdate = Boolean(payload.id);
     const userKey = getUserVehicleStorageKey(userId);
@@ -231,8 +220,65 @@ export const vehicleService = {
       '/vehicle/save',
     ];
 
-    // 2. Execute POST request to official endpoint /vehicle/save
+    const fileFields = [
+      'rc_upload',
+      'insurance_doc_upload',
+      'vehicle_img_front',
+      'vehicle_img_back',
+      'vehicle_img_left',
+      'vehicle_img_right',
+    ];
+
+    // 2. Construct FormData for multipart upload
+    const formData = new FormData();
+    const allowedFields = isUpdate ? ALLOWED_VEHICLE_UPDATE_FIELDS : ALLOWED_VEHICLE_ADD_FIELDS;
+    for (const key of allowedFields) {
+      if (fileFields.includes(key)) {
+        const fileObj = files?.[key];
+        if (fileObj && fileObj.uri) {
+          const extension = fileObj.type?.includes('pdf') ? 'pdf' : 'jpg';
+          const safeName = fileObj.name || getSafeFileName(key, undefined, extension);
+          formData.append(key, {
+            uri: fileObj.uri,
+            name: safeName,
+            type: fileObj.type || (extension === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+          } as any);
+        } else if (payload[key as keyof VehicleProfile] && !isLocalFileUri(String(payload[key as keyof VehicleProfile]))) {
+          // Preserve existing server-relative path or URL
+          formData.append(key, String(payload[key as keyof VehicleProfile]));
+        }
+      } else {
+        formData.append(key, sanitizedPayload[key] !== undefined ? String(sanitizedPayload[key]) : '');
+      }
+    }
+
+    if (userId) {
+      formData.append('user_id', String(userId));
+    }
+    if (payload.id) {
+      formData.append('id', String(payload.id));
+    }
+
+    // 3. Execute POST request to official endpoint /vehicle/save
     for (const endpoint of endpoints) {
+      // 3A. Try multipart/form-data upload
+      try {
+        const res = await client.post(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (res.data) {
+          const body = res.data;
+          const isControllerErr =
+            typeof body === 'string' && body.includes('not a valid controller name');
+          if (!isControllerErr && (body.status === 'success' || body.status === 1 || body.vehicle || body.data || body.success)) {
+            apiMessage = body?.message || (isUpdate ? 'Vehicle updated successfully' : 'Vehicle added successfully');
+            apiResponseData = body?.vehicle || body?.data || body;
+            break;
+          }
+        }
+      } catch {}
+
+      // 3B. Try standard JSON fallback if server requires JSON
       try {
         const res = await client.post(endpoint, {
           ...sanitizedPayload,
@@ -257,7 +303,20 @@ export const vehicleService = {
       }
     }
 
-    // 3. Update user-scoped storage with strictly mapped vehicle profile
+    // Helper to safely extract server-relative paths or fall back to existing clean paths
+    const resolveVehicleServerPath = (field: keyof VehicleProfile): string => {
+      const remoteVal = apiResponseData?.[field];
+      if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
+        return remoteVal;
+      }
+      const existingVal = payload[field];
+      if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
+        return existingVal;
+      }
+      return '';
+    };
+
+    // 4. Update user-scoped storage with strictly mapped vehicle profile (NO local device paths)
     const savedVehicleObject: VehicleProfile = {
       id: payload.id || (apiResponseData?.vehicle_id ? String(apiResponseData.vehicle_id) : apiResponseData?.id ? String(apiResponseData.id) : `vehicle_${Date.now()}`),
       user_id: userId ? String(userId) : payload.user_id || '',
@@ -270,16 +329,16 @@ export const vehicleService = {
       fuel_type: String(sanitizedPayload.fuel_type || ''),
       drive_type: String(sanitizedPayload.drive_type || ''),
       vehicle_nick_name: String(sanitizedPayload.vehicle_nick_name || ''),
-      rc_upload: sanitizedPayload.rc_upload || payload.rc_upload || '',
+      rc_upload: resolveVehicleServerPath('rc_upload'),
       rc_validity: String(sanitizedPayload.rc_validity || ''),
       insurance_no: String(sanitizedPayload.insurance_no || ''),
       insurance_validity: String(sanitizedPayload.insurance_validity || ''),
       insurance_company: String(sanitizedPayload.insurance_company || ''),
-      insurance_doc_upload: sanitizedPayload.insurance_doc_upload || payload.insurance_doc_upload || '',
-      vehicle_img_front: sanitizedPayload.vehicle_img_front || payload.vehicle_img_front || '',
-      vehicle_img_back: sanitizedPayload.vehicle_img_back || payload.vehicle_img_back || '',
-      vehicle_img_left: sanitizedPayload.vehicle_img_left || payload.vehicle_img_left || '',
-      vehicle_img_right: sanitizedPayload.vehicle_img_right || payload.vehicle_img_right || '',
+      insurance_doc_upload: resolveVehicleServerPath('insurance_doc_upload'),
+      vehicle_img_front: resolveVehicleServerPath('vehicle_img_front'),
+      vehicle_img_back: resolveVehicleServerPath('vehicle_img_back'),
+      vehicle_img_left: resolveVehicleServerPath('vehicle_img_left'),
+      vehicle_img_right: resolveVehicleServerPath('vehicle_img_right'),
       vehicle_additional_info: String(sanitizedPayload.vehicle_additional_info || ''),
       status: sanitizedPayload.status !== undefined ? sanitizedPayload.status : 1,
       created_at: apiResponseData?.created_at || new Date().toISOString(),

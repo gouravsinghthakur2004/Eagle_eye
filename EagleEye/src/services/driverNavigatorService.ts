@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { DriverNavigatorProfile } from '@/types';
+import { SelectedFile } from '@/utils/fileValidation';
+import { isLocalFileUri, getSafeFileName } from '@/utils/fileUrl';
 
 const getUserStorageKey = (userId?: string | number): string => {
   if (!userId) return '@eagleeye_driver_navigator_profiles_guest';
@@ -39,7 +41,8 @@ export const ALLOWED_API_POST_FIELDS = [
 ] as const;
 
 /**
- * Strict Payload Sanitizer: Guarantees ONLY allowed API fields exist in the request payload.
+ * Strict Payload Sanitizer: Guarantees ONLY allowed API fields exist in the request payload,
+ * and strips out local client-side filesystem URIs (file://, C:\...) from text JSON.
  */
 export const sanitizeDriverNavigatorPayload = (
   raw: Partial<DriverNavigatorProfile>
@@ -47,7 +50,17 @@ export const sanitizeDriverNavigatorPayload = (
   const sanitized: Record<string, string> = {};
   for (const field of ALLOWED_API_POST_FIELDS) {
     const val = raw[field as keyof DriverNavigatorProfile];
-    sanitized[field] = val !== undefined && val !== null ? String(val) : '';
+    if (val !== undefined && val !== null) {
+      const strVal = String(val);
+      // Strip out local client-side URIs from raw text JSON
+      if (isLocalFileUri(strVal)) {
+        sanitized[field] = '';
+      } else {
+        sanitized[field] = strVal;
+      }
+    } else {
+      sanitized[field] = '';
+    }
   }
   return sanitized;
 };
@@ -100,35 +113,27 @@ export const driverNavigatorService = {
       else if (data?.data && Array.isArray(data.data)) remoteProfiles = data.data;
 
       if (remoteProfiles.length > 0) {
-        for (const r of remoteProfiles) {
-          const itemRole = r.role_type || roleType || 'driver';
-          const itemUserId = r.user_id || (userId ? String(userId) : '');
-          const itemId = r.id ? String(r.id) : `remote_${Date.now()}_${Math.random()}`;
-
-          // Accept and merge profile
-          const merged: DriverNavigatorProfile = {
-            ...r,
-            id: itemId,
-            user_id: itemUserId,
-            role_type: itemRole,
-          };
-          profilesMap.set(itemId, merged);
+        for (const p of remoteProfiles) {
+          const profileId = p.id ? String(p.id) : null;
+          if (profileId) {
+            profilesMap.set(profileId, {
+              ...p,
+              id: profileId,
+              user_id: p.user_id ? String(p.user_id) : (userId ? String(userId) : ''),
+            });
+          }
         }
-
-        const mergedList = Array.from(profilesMap.values());
+        const updatedList = Array.from(profilesMap.values());
         try {
-          await AsyncStorage.setItem(userKey, JSON.stringify(mergedList));
+          await AsyncStorage.setItem(userKey, JSON.stringify(updatedList));
         } catch {}
+        return updatedList;
       }
     } catch (remoteErr) {
-      console.warn('[driverNavigatorService] Remote GET failed, using user-scoped local storage:', remoteErr);
+      console.warn('[driverNavigatorService] Remote GET failed, using local:', remoteErr);
     }
 
-    const allMerged = Array.from(profilesMap.values());
-    if (roleType) {
-      return allMerged.filter((p) => p.role_type === roleType);
-    }
-    return allMerged;
+    return Array.from(profilesMap.values());
   },
 
   /**
@@ -153,11 +158,13 @@ export const driverNavigatorService = {
 
   /**
    * POST /driver/save
-   * Enforces 100% strict payload field sanitization and attaches userId.
+   * Implements complete multipart FormData upload for documents and images.
+   * Ensures the database stores ONLY server-relative paths and NEVER client filesystem paths.
    */
   saveProfile: async (
     payload: Partial<DriverNavigatorProfile>,
-    userId?: string | number
+    userId?: string | number,
+    files?: Partial<Record<'driver_pic_upload' | 'dl_upload' | 'insurance_document', SelectedFile>>
   ): Promise<{ success: boolean; data?: DriverNavigatorProfile; message?: string }> => {
     const userKey = getUserStorageKey(userId);
 
@@ -174,12 +181,61 @@ export const driverNavigatorService = {
       '/driver_navigator/save',
     ];
 
-    // 2. Execute POST request to official endpoint /driver/save
+    // 2. Construct FormData for multipart upload
+    const formData = new FormData();
+    for (const key of ALLOWED_API_POST_FIELDS) {
+      const isFileField = key === 'driver_pic_upload' || key === 'dl_upload' || key === 'insurance_document';
+      if (isFileField) {
+        const fileObj = files?.[key];
+        if (fileObj && fileObj.uri) {
+          const extension = fileObj.type?.includes('pdf') ? 'pdf' : 'jpg';
+          const safeName = fileObj.name || getSafeFileName(key, undefined, extension);
+          formData.append(key, {
+            uri: fileObj.uri,
+            name: safeName,
+            type: fileObj.type || (extension === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+          } as any);
+        } else if (payload[key] && !isLocalFileUri(String(payload[key]))) {
+          // Preserve existing server-relative path or URL
+          formData.append(key, String(payload[key]));
+        }
+      } else {
+        formData.append(key, sanitizedPayload[key] || '');
+      }
+    }
+
+    if (userId) {
+      formData.append('user_id', String(userId));
+    }
+    if (payload.id) {
+      formData.append('id', String(payload.id));
+    }
+
+    // 3. Execute POST request to official endpoint /driver/save
     for (const endpoint of endpoints) {
+      // 3A. Try multipart/form-data upload
+      try {
+        const res = await client.post(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (res.data) {
+          const body = res.data;
+          const isControllerErr =
+            typeof body === 'string' && body.includes('not a valid controller name');
+          if (!isControllerErr && (body.status === 'success' || body.status === 1 || body.profile || body.data || body.success)) {
+            apiMessage = body?.message || 'Driver/Navigator updated successfully';
+            apiResponseData = body?.profile || body?.data || body;
+            break;
+          }
+        }
+      } catch {}
+
+      // 3B. Try standard JSON fallback if server requires JSON
       try {
         const res = await client.post(endpoint, {
           ...sanitizedPayload,
           user_id: userId ? String(userId) : undefined,
+          id: payload.id ? String(payload.id) : undefined,
         });
         if (res.data) {
           const body = res.data;
@@ -200,7 +256,20 @@ export const driverNavigatorService = {
       }
     }
 
-    // 3. Update user-scoped storage with strictly mapped profile
+    // Helper to safely extract server-relative paths or fall back to existing clean paths
+    const resolveServerPath = (field: 'driver_pic_upload' | 'dl_upload' | 'insurance_document'): string => {
+      const remoteVal = apiResponseData?.[field];
+      if (remoteVal && typeof remoteVal === 'string' && !isLocalFileUri(remoteVal)) {
+        return remoteVal;
+      }
+      const existingVal = payload[field];
+      if (existingVal && typeof existingVal === 'string' && !isLocalFileUri(existingVal)) {
+        return existingVal;
+      }
+      return '';
+    };
+
+    // 4. Update user-scoped storage with strictly mapped profile (NO local device paths)
     const savedProfileObject: DriverNavigatorProfile = {
       id: payload.id || (apiResponseData?.id ? String(apiResponseData.id) : `profile_${Date.now()}`),
       user_id: userId ? String(userId) : payload.user_id || '',
@@ -216,8 +285,8 @@ export const driverNavigatorService = {
       email: sanitizedPayload.email,
       dl_no: sanitizedPayload.dl_no,
       dl_validity: sanitizedPayload.dl_validity,
-      dl_upload: sanitizedPayload.dl_upload,
-      driver_pic_upload: sanitizedPayload.driver_pic_upload,
+      dl_upload: resolveServerPath('dl_upload'),
+      driver_pic_upload: resolveServerPath('driver_pic_upload'),
       instagram_handle: sanitizedPayload.instagram_handle,
       emergency_contact_name: sanitizedPayload.emergency_contact_name,
       emergency_contact_no: sanitizedPayload.emergency_contact_no,
@@ -225,7 +294,7 @@ export const driverNavigatorService = {
       t_shirt_size: sanitizedPayload.t_shirt_size,
       asn_fmn_lic: sanitizedPayload.asn_fmn_lic,
       insurance_no: sanitizedPayload.insurance_no,
-      insurance_document: sanitizedPayload.insurance_document,
+      insurance_document: resolveServerPath('insurance_document'),
       insurance_validity: sanitizedPayload.insurance_validity,
       medical_condition: sanitizedPayload.medical_condition,
       approval_status: apiResponseData?.approval_status || '0',

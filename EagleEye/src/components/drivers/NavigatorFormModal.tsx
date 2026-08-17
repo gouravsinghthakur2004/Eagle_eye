@@ -258,21 +258,22 @@ export const NavigatorFormModal: React.FC<NavigatorFormModalProps> = ({
       setSaving(true);
 
       const finalData: Partial<DriverNavigatorProfile> = { ...formData, role_type: 'navigator' };
+      const optimizedFilesMap: Partial<Record<'driver_pic_upload' | 'dl_upload' | 'insurance_document', SelectedFile>> = {};
 
       if (selectedFiles.driver_pic_upload) {
         const res = await fileCompression.compressImageIfNeeded(selectedFiles.driver_pic_upload);
-        finalData.driver_pic_upload = res.file.uri;
+        optimizedFilesMap.driver_pic_upload = res.file;
       }
       if (selectedFiles.dl_upload) {
         const res = await fileCompression.compressImageIfNeeded(selectedFiles.dl_upload);
-        finalData.dl_upload = res.file.uri;
+        optimizedFilesMap.dl_upload = res.file;
       }
       if (selectedFiles.insurance_document) {
         const res = await fileCompression.compressImageIfNeeded(selectedFiles.insurance_document);
-        finalData.insurance_document = res.file.uri;
+        optimizedFilesMap.insurance_document = res.file;
       }
 
-      const res = await driverNavigatorService.saveProfile(finalData, userId);
+      const res = await driverNavigatorService.saveProfile(finalData, userId, optimizedFilesMap);
       setSaving(false);
 
       if (res.success && res.data) {

@@ -14,6 +14,7 @@ import {
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { fileValidation, SelectedFile } from '@/utils/fileValidation';
 import { fileCompression } from '@/utils/fileCompression';
+import { getFileUrl } from '@/utils/fileUrl';
 
 interface FileUploadInputProps {
   label: string;
@@ -59,19 +60,18 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Sync state if initial value string (URL or URI) exists
+  // Sync state if initial value string (URL, relative path, or URI) exists
   React.useEffect(() => {
-    if (value) {
-      if (value.startsWith('http') || value.startsWith('file:') || value.startsWith('content:')) {
-        const ext = value.split('.').pop()?.split('?')[0].toLowerCase() || 'jpg';
-        const isPdf = ext === 'pdf';
-        setSelectedFile({
-          uri: value,
-          name: value.split('/').pop()?.split('?')[0] || `${label.toLowerCase().replace(/\s+/g, '_')}.${isPdf ? 'pdf' : 'jpg'}`,
-          type: isPdf ? 'application/pdf' : 'image/jpeg',
-          size: isPdf ? 1.2 * 1024 * 1024 : 350 * 1024,
-        });
-      }
+    if (value && typeof value === 'string' && value.trim()) {
+      const displayUri = getFileUrl(value);
+      const ext = value.split('.').pop()?.split('?')[0].toLowerCase() || 'jpg';
+      const isPdf = ext === 'pdf';
+      setSelectedFile({
+        uri: displayUri,
+        name: value.split('/').pop()?.split('?')[0] || `${label.toLowerCase().replace(/\s+/g, '_')}.${isPdf ? 'pdf' : 'jpg'}`,
+        type: isPdf ? 'application/pdf' : 'image/jpeg',
+        size: isPdf ? 1.2 * 1024 * 1024 : 350 * 1024,
+      });
     } else {
       setSelectedFile(null);
     }

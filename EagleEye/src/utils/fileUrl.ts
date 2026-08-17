@@ -1,0 +1,68 @@
+/**
+ * Production File & Image URL Formatter for EagleEye Motorsports
+ * Converts server-relative paths to full public CDN/Server URLs.
+ * Ensures local device filesystem paths (file://, content://, C:\...) are never used as remote URLs.
+ */
+
+export const SERVER_BASE_URL = 'https://eagleeyeofficial.com/demo';
+
+/**
+ * Checks if a given path is a local device path/URI
+ */
+export const isLocalFileUri = (path?: string | null): boolean => {
+  if (!path || typeof path !== 'string') return false;
+  const trimmed = path.trim();
+  return (
+    trimmed.startsWith('file://') ||
+    trimmed.startsWith('content://') ||
+    trimmed.includes(':\\') ||
+    trimmed.startsWith('/data/user/') ||
+    trimmed.startsWith('/var/mobile/') ||
+    trimmed.startsWith('/storage/emulated/')
+  );
+};
+
+/**
+ * Returns a clean, displayable public URL from a server-relative path or existing URL.
+ * Example: 'uploads/drivers/photos/driver_1.jpg' -> 'https://eagleeyeofficial.com/demo/uploads/drivers/photos/driver_1.jpg'
+ */
+export const getFileUrl = (path?: string | null): string => {
+  if (!path || typeof path !== 'string') return '';
+  const trimmed = path.trim();
+  if (!trimmed) return '';
+
+  // Already a full remote URL (http:// or https://)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  // Local device path (valid for local file preview in Image component on device, but not a server URL)
+  if (isLocalFileUri(trimmed)) {
+    return trimmed;
+  }
+
+  // Relative server path: prepend SERVER_BASE_URL
+  const cleanPath = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+  return `${SERVER_BASE_URL}/${cleanPath}`;
+};
+
+/**
+ * Extracts a clean safe filename from a file object or path
+ */
+export const getSafeFileName = (
+  prefix: string,
+  originalName?: string,
+  extension: string = 'jpg'
+): string => {
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  if (originalName) {
+    const ext = originalName.split('.').pop()?.toLowerCase() || extension;
+    const sanitizedBase = originalName
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 20);
+    return `${prefix}_${sanitizedBase}_${timestamp}_${randomSuffix}.${ext}`;
+  }
+  return `${prefix}_${timestamp}_${randomSuffix}.${extension}`;
+};

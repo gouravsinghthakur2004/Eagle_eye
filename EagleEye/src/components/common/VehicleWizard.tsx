@@ -390,53 +390,58 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
         isUploading: true,
       });
 
-      const processedVehicles = await Promise.all(
-        vehicles.map(async (v) => {
-          const vCopy = { ...v };
-          const keys: VehicleUploadFieldKey[] = [
-            'rc_upload',
-            'insurance_doc_upload',
-            'vehicle_img_front',
-            'vehicle_img_back',
-            'vehicle_img_left',
-            'vehicle_img_right',
-          ];
+      const processedVehicles: VehicleProfile[] = [];
 
-          for (const key of keys) {
-            const fileKey = `${v.tempId}_${key}`;
-            const fileObj = selectedFiles[fileKey];
-            if (fileObj) {
-              const { file: optimizedFile } = await fileCompression.compressImageIfNeeded(fileObj);
-              vCopy[key] = optimizedFile.uri;
-            }
+      for (let i = 0; i < vehicles.length; i++) {
+        const v = vehicles[i];
+        const vCopy = { ...v };
+        const vFilesMap: Partial<Record<string, SelectedFile>> = {};
+
+        const keys: VehicleUploadFieldKey[] = [
+          'rc_upload',
+          'insurance_doc_upload',
+          'vehicle_img_front',
+          'vehicle_img_back',
+          'vehicle_img_left',
+          'vehicle_img_right',
+        ];
+
+        for (const key of keys) {
+          const fileKey = `${v.tempId}_${key}`;
+          const fileObj = selectedFiles[fileKey];
+          if (fileObj) {
+            const { file: optimizedFile } = await fileCompression.compressImageIfNeeded(fileObj);
+            vFilesMap[key] = optimizedFile;
+            vCopy[key] = '';
           }
-          return vCopy;
-        })
-      );
+        }
+
+        const saveRes = await vehicleService.saveVehicle(vCopy, userId, vFilesMap);
+        if (saveRes.data) {
+          processedVehicles.push(saveRes.data);
+        }
+      }
 
       setUploadStatus({
         stepName: 'Submitting vehicles telemetry…',
-        percent: 85,
-        isUploading: true,
+        percent: 100,
+        isUploading: false,
       });
 
-      const res = await vehicleService.saveMultipleVehicles(processedVehicles, userId);
       setIsSubmitting(false);
 
-      if (res.success) {
-        if (processedVehicles && processedVehicles.length > 0) {
-          selectVehicleForJoin(processedVehicles[0]);
-        }
-        await AsyncStorage.removeItem(draftKey);
-        Alert.alert('Success', res.message || 'Vehicle profiles saved successfully!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              if (onSuccess) onSuccess();
-            },
-          },
-        ]);
+      if (processedVehicles.length > 0) {
+        selectVehicleForJoin(processedVehicles[0]);
       }
+      await AsyncStorage.removeItem(draftKey);
+      Alert.alert('Success', 'Vehicle profile(s) saved successfully!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (onSuccess) onSuccess();
+          },
+        },
+      ]);
     } catch (err: any) {
       setIsSubmitting(false);
       console.warn('Vehicle Submit error:', err);

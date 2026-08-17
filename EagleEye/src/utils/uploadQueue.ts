@@ -37,6 +37,7 @@ export const uploadQueue = {
       let completedSteps = 0;
 
       const finalPayload: Partial<DriverNavigatorProfile> = { ...profileData };
+      const optimizedFilesMap: Partial<Record<'driver_pic_upload' | 'dl_upload' | 'insurance_document', SelectedFile>> = {};
 
       // 1. Process & Compress files
       for (const key of pendingKeys) {
@@ -56,8 +57,8 @@ export const uploadQueue = {
           // Compress image files
           const { file: optimizedFile } = await fileCompression.compressImageIfNeeded(fileObj);
           
-          // Store URI string on payload for exact API compatibility
-          finalPayload[key] = optimizedFile.uri;
+          // Store optimized file object for multipart FormData upload (NEVER local URI string)
+          optimizedFilesMap[key] = optimizedFile;
 
           completedSteps++;
           if (onProgress) {
@@ -71,7 +72,7 @@ export const uploadQueue = {
         }
       }
 
-      // 2. Finalize submission via service
+      // 2. Finalize submission via service with multipart files
       if (onProgress) {
         onProgress({
           stepName: 'Finalizing profile submission…',
@@ -80,7 +81,7 @@ export const uploadQueue = {
         });
       }
 
-      const result = await driverNavigatorService.saveProfile(finalPayload, userId);
+      const result = await driverNavigatorService.saveProfile(finalPayload, userId, optimizedFilesMap);
 
 
       if (onProgress) {
