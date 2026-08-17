@@ -43,6 +43,12 @@ client.interceptors.request.use(
       console.warn('Error reading token for request interceptor:', error);
     }
 
+    // When sending FormData (multipart upload), delete default 'application/json'
+    // so React Native's native network client automatically creates the multipart boundary
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
+
     if (__DEV__) {
       console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, sanitizeData(config.data));
     }
