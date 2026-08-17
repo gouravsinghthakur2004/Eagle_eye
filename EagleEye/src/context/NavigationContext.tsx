@@ -220,24 +220,17 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Session restoration states
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<UserProfile | null>(null);
-
 
   // Session restoration on app launch - Persistent session management
   const restoreSession = async () => {
     let token: string | null = null;
 
-    // Safety fallback timer to prevent infinite loading state
-    const safetyTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
-
     try {
       setIsLoading(true);
 
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 600));
-
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 300));
       token = await Promise.race([AuthService.getStoredToken(), timeoutPromise]);
       const storedUser = await Promise.race([AuthService.getStoredUser(), timeoutPromise]);
 
@@ -257,7 +250,6 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setUser(null);
       setHistory(['Landing']);
     } finally {
-      clearTimeout(safetyTimer);
       setIsLoading(false);
     }
 
