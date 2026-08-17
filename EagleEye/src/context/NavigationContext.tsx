@@ -204,11 +204,19 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const selectDriverForJoin = (driver: any) => {
+    if (driver && driver.role_type && String(driver.role_type).toLowerCase() !== 'driver') {
+      console.warn('[selectDriverForJoin] Rejected invalid entity selection for Driver:', driver);
+      return;
+    }
     setSelectedDriverForJoin(driver);
     goBack();
   };
 
   const selectNavigatorForJoin = (navigator: any) => {
+    if (navigator && navigator.role_type && String(navigator.role_type).toLowerCase() !== 'navigator') {
+      console.warn('[selectNavigatorForJoin] Rejected invalid entity selection for Navigator:', navigator);
+      return;
+    }
     setSelectedNavigatorForJoin(navigator);
     goBack();
   };

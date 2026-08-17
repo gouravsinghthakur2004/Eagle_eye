@@ -7,7 +7,6 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
@@ -15,16 +14,17 @@ import { Header } from '@/components/layout/Header';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { driverNavigatorService } from '@/services/driverNavigatorService';
 import { DriverNavigatorProfile } from '@/types';
+import { DriverFormModal } from '@/components/drivers/DriverFormModal';
 
 export const SelectDriverScreen: React.FC = () => {
-  const { goBack, navigate, user, selectDriverForJoin, currentScreen } = useAppNavigation();
+  const { goBack, user, selectDriverForJoin, currentScreen } = useAppNavigation();
   const userId = user?.id || (user as any)?.user_id;
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
   const [drivers, setDrivers] = useState<DriverNavigatorProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
   // Debounce search query 400ms
   useEffect(() => {
@@ -37,13 +37,16 @@ export const SelectDriverScreen: React.FC = () => {
   const fetchDrivers = useCallback(async () => {
     try {
       setLoading(true);
+      // Strictly fetch only profiles with role_type === 'driver'
       const profiles = await driverNavigatorService.getProfiles(userId, 'driver');
-      setDrivers(profiles);
+      const strictlyDrivers = profiles.filter(
+        (p) => String(p.role_type || '').toLowerCase() === 'driver'
+      );
+      setDrivers(strictlyDrivers);
     } catch (err) {
       console.warn('[SelectDriverScreen] Fetch error:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [userId]);
 
@@ -54,26 +57,40 @@ export const SelectDriverScreen: React.FC = () => {
     }
   }, [currentScreen, fetchDrivers]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchDrivers();
-  };
-
   const isQueryValid = debouncedQuery.trim().length >= 2;
 
+  // STRICT ENTITY ISOLATION: Must match query AND have role_type === 'driver'
   const filteredDrivers = isQueryValid
     ? drivers.filter((d) => {
+        const isDriver = String(d.role_type || '').toLowerCase() === 'driver';
+        if (!isDriver) return false;
+
         const query = debouncedQuery.toLowerCase().trim();
-        return Boolean(d.full_name?.toLowerCase().includes(query));
+        const nameMatch = d.full_name?.toLowerCase().includes(query);
+        const nickMatch = d.race_nick_name?.toLowerCase().includes(query);
+        const mobileMatch = d.mobile_no?.includes(query);
+        return Boolean(nameMatch || nickMatch || mobileMatch);
       })
     : [];
 
   const handleSelectDriver = (driver: DriverNavigatorProfile) => {
+    if (String(driver.role_type || '').toLowerCase() !== 'driver') {
+      console.warn('[SelectDriverScreen] Attempted to select non-driver entity:', driver);
+      return;
+    }
     selectDriverForJoin(driver);
   };
 
-  const handleAddDriver = () => {
-    navigate('DriverNavigatorProfile');
+  const handleOpenAddDriver = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const handleDriverSaved = (savedDriver: DriverNavigatorProfile) => {
+    if (String(savedDriver.role_type || '').toLowerCase() === 'driver') {
+      selectDriverForJoin(savedDriver);
+      setDrivers((prev) => [savedDriver, ...prev]);
+    }
+    fetchDrivers();
   };
 
   return (
@@ -102,7 +119,7 @@ export const SelectDriverScreen: React.FC = () => {
       </View>
 
       {/* Main List / Loading / Prompt / Empty */}
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Searching registered drivers…</Text>
@@ -114,7 +131,7 @@ export const SelectDriverScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>
             Type at least 2 characters of the driver's full name in the search bar above to view matching drivers.
           </Text>
-          <TouchableOpacity style={styles.addDriverBtn} onPress={handleAddDriver}>
+          <TouchableOpacity style={styles.addDriverBtn} onPress={handleOpenAddDriver}>
             <Text style={styles.addDriverBtnText}>+ Add New Driver</Text>
           </TouchableOpacity>
         </View>
@@ -123,13 +140,7 @@ export const SelectDriverScreen: React.FC = () => {
           data={filteredDrivers}
           keyExtractor={(item, index) => String(item.id || index)}
           contentContainerStyle={styles.listPadding}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={COLORS.primary}
-            />
-          }
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>🏎️</Text>
@@ -137,7 +148,7 @@ export const SelectDriverScreen: React.FC = () => {
               <Text style={styles.emptySubtitle}>
                 No driver matching "{searchQuery}" was found in your registered team records.
               </Text>
-              <TouchableOpacity style={styles.addDriverBtn} onPress={handleAddDriver}>
+              <TouchableOpacity style={styles.addDriverBtn} onPress={handleOpenAddDriver}>
                 <Text style={styles.addDriverBtnText}>+ Add New Driver</Text>
               </TouchableOpacity>
             </View>
@@ -166,6 +177,10 @@ export const SelectDriverScreen: React.FC = () => {
               </View>
 
               <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>ROLE:</Text>
+                <Text style={styles.roleBadge}>DRIVER</Text>
+              </View>
+              <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>MOBILE:</Text>
                 <Text style={styles.infoVal}>{item.mobile_no || 'N/A'}</Text>
               </View>
@@ -179,6 +194,13 @@ export const SelectDriverScreen: React.FC = () => {
           )}
         />
       )}
+
+      {/* Driver Add Modal */}
+      <DriverFormModal
+        visible={isAddModalOpen}
+        onSave={handleDriverSaved}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -220,6 +242,7 @@ const styles = StyleSheet.create({
   clearBtnText: {
     color: COLORS.textMuted,
     fontSize: 14,
+    fontWeight: '700',
   },
   centered: {
     flex: 1,
@@ -236,94 +259,24 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  driverItemCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: COLORS.primaryGlow,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  avatarText: {
-    color: COLORS.primaryLight,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  nameContainer: {
-    flex: 1,
-  },
-  driverName: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  nickName: {
-    color: COLORS.accentOrange,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  selectBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  selectBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
-  },
-  infoLabel: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  infoVal: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
   emptyCard: {
+    margin: 20,
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    padding: 30,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    marginTop: 20,
   },
   emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
+    fontSize: 44,
+    marginBottom: 16,
   },
   emptyTitle: {
     color: COLORS.white,
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
@@ -337,11 +290,96 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   addDriverBtnText: {
-    color: COLORS.white,
+    color: '#000000',
     fontSize: 14,
+    fontWeight: '900',
+  },
+  driverItemCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
+  },
+  avatarBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  avatarText: {
+    color: COLORS.primaryLight,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  driverName: {
+    color: COLORS.white,
+    fontSize: 16,
     fontWeight: '800',
+  },
+  nickName: {
+    color: COLORS.accentOrange,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  selectBadge: {
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  selectBadgeText: {
+    color: COLORS.primaryLight,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  infoLabel: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  infoVal: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  roleBadge: {
+    color: COLORS.primaryLight,
+    backgroundColor: 'rgba(255, 122, 0, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

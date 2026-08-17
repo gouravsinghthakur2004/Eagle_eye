@@ -184,9 +184,13 @@ export const JoinEventScreen: React.FC = () => {
     }
     if (!selectedDriverForJoin?.id) {
       errors.push('Please select a registered Driver.');
+    } else if (selectedDriverForJoin.role_type && String(selectedDriverForJoin.role_type).toLowerCase() !== 'driver') {
+      errors.push('Selected Driver must be a valid Driver profile.');
     }
     if (!selectedNavigatorForJoin?.id) {
       errors.push('Please select a registered Navigator.');
+    } else if (selectedNavigatorForJoin.role_type && String(selectedNavigatorForJoin.role_type).toLowerCase() !== 'navigator') {
+      errors.push('Selected Navigator must be a valid Navigator profile.');
     }
     if (!selectedVehicleForJoin?.id) {
       errors.push('Please select a registered Race Vehicle.');

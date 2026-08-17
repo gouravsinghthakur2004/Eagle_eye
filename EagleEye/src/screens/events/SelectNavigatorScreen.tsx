@@ -7,7 +7,6 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
@@ -15,16 +14,17 @@ import { Header } from '@/components/layout/Header';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { driverNavigatorService } from '@/services/driverNavigatorService';
 import { DriverNavigatorProfile } from '@/types';
+import { NavigatorFormModal } from '@/components/drivers/NavigatorFormModal';
 
 export const SelectNavigatorScreen: React.FC = () => {
-  const { goBack, navigate, user, selectNavigatorForJoin, currentScreen } = useAppNavigation();
+  const { goBack, user, selectNavigatorForJoin, currentScreen } = useAppNavigation();
   const userId = user?.id || (user as any)?.user_id;
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
   const [navigators, setNavigators] = useState<DriverNavigatorProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
   // Debounce search query 400ms
   useEffect(() => {
@@ -37,13 +37,16 @@ export const SelectNavigatorScreen: React.FC = () => {
   const fetchNavigators = useCallback(async () => {
     try {
       setLoading(true);
+      // Strictly fetch only profiles with role_type === 'navigator'
       const profiles = await driverNavigatorService.getProfiles(userId, 'navigator');
-      setNavigators(profiles);
+      const strictlyNavigators = profiles.filter(
+        (p) => String(p.role_type || '').toLowerCase() === 'navigator'
+      );
+      setNavigators(strictlyNavigators);
     } catch (err) {
       console.warn('[SelectNavigatorScreen] Fetch error:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [userId]);
 
@@ -54,26 +57,40 @@ export const SelectNavigatorScreen: React.FC = () => {
     }
   }, [currentScreen, fetchNavigators]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchNavigators();
-  };
-
   const isQueryValid = debouncedQuery.trim().length >= 2;
 
+  // STRICT ENTITY ISOLATION: Must match query AND have role_type === 'navigator'
   const filteredNavigators = isQueryValid
     ? navigators.filter((n) => {
+        const isNavigator = String(n.role_type || '').toLowerCase() === 'navigator';
+        if (!isNavigator) return false;
+
         const query = debouncedQuery.toLowerCase().trim();
-        return Boolean(n.full_name?.toLowerCase().includes(query));
+        const nameMatch = n.full_name?.toLowerCase().includes(query);
+        const nickMatch = n.race_nick_name?.toLowerCase().includes(query);
+        const mobileMatch = n.mobile_no?.includes(query);
+        return Boolean(nameMatch || nickMatch || mobileMatch);
       })
     : [];
 
   const handleSelectNavigator = (navigator: DriverNavigatorProfile) => {
+    if (String(navigator.role_type || '').toLowerCase() !== 'navigator') {
+      console.warn('[SelectNavigatorScreen] Attempted to select non-navigator entity:', navigator);
+      return;
+    }
     selectNavigatorForJoin(navigator);
   };
 
-  const handleAddNavigator = () => {
-    navigate('DriverNavigatorProfile');
+  const handleOpenAddNavigator = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const handleNavigatorSaved = (savedNavigator: DriverNavigatorProfile) => {
+    if (String(savedNavigator.role_type || '').toLowerCase() === 'navigator') {
+      selectNavigatorForJoin(savedNavigator);
+      setNavigators((prev) => [savedNavigator, ...prev]);
+    }
+    fetchNavigators();
   };
 
   return (
@@ -102,7 +119,7 @@ export const SelectNavigatorScreen: React.FC = () => {
       </View>
 
       {/* Main List / Loading / Prompt / Empty */}
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Searching registered navigators…</Text>
@@ -114,7 +131,7 @@ export const SelectNavigatorScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>
             Type at least 2 characters of the navigator's full name in the search bar above to view matching navigators.
           </Text>
-          <TouchableOpacity style={styles.addNavigatorBtn} onPress={handleAddNavigator}>
+          <TouchableOpacity style={styles.addNavigatorBtn} onPress={handleOpenAddNavigator}>
             <Text style={styles.addNavigatorBtnText}>+ Add New Navigator</Text>
           </TouchableOpacity>
         </View>
@@ -123,13 +140,7 @@ export const SelectNavigatorScreen: React.FC = () => {
           data={filteredNavigators}
           keyExtractor={(item, index) => String(item.id || index)}
           contentContainerStyle={styles.listPadding}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={COLORS.primary}
-            />
-          }
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>🗺️</Text>
@@ -137,7 +148,7 @@ export const SelectNavigatorScreen: React.FC = () => {
               <Text style={styles.emptySubtitle}>
                 No navigator matching "{searchQuery}" was found in your registered team records.
               </Text>
-              <TouchableOpacity style={styles.addNavigatorBtn} onPress={handleAddNavigator}>
+              <TouchableOpacity style={styles.addNavigatorBtn} onPress={handleOpenAddNavigator}>
                 <Text style={styles.addNavigatorBtnText}>+ Add New Navigator</Text>
               </TouchableOpacity>
             </View>
@@ -166,6 +177,10 @@ export const SelectNavigatorScreen: React.FC = () => {
               </View>
 
               <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>ROLE:</Text>
+                <Text style={styles.roleBadge}>NAVIGATOR</Text>
+              </View>
+              <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>MOBILE:</Text>
                 <Text style={styles.infoVal}>{item.mobile_no || 'N/A'}</Text>
               </View>
@@ -179,6 +194,13 @@ export const SelectNavigatorScreen: React.FC = () => {
           )}
         />
       )}
+
+      {/* Navigator Add Modal */}
+      <NavigatorFormModal
+        visible={isAddModalOpen}
+        onSave={handleNavigatorSaved}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -220,6 +242,7 @@ const styles = StyleSheet.create({
   clearBtnText: {
     color: COLORS.textMuted,
     fontSize: 14,
+    fontWeight: '700',
   },
   centered: {
     flex: 1,
@@ -236,6 +259,44 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  emptyCard: {
+    margin: 20,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  emptyIcon: {
+    fontSize: 44,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  addNavigatorBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  addNavigatorBtnText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   navigatorItemCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 16,
@@ -248,22 +309,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
   },
   avatarBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: COLORS.primary,
   },
   avatarText: {
-    color: '#60A5FA',
+    color: COLORS.primaryLight,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   nameContainer: {
     flex: 1,
@@ -275,26 +339,28 @@ const styles = StyleSheet.create({
   },
   nickName: {
     color: COLORS.accentOrange,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
+    marginTop: 2,
   },
   selectBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   selectBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
+    color: COLORS.primaryLight,
+    fontSize: 12,
     fontWeight: '800',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
+    alignItems: 'center',
+    paddingVertical: 3,
   },
   infoLabel: {
     color: COLORS.textMuted,
@@ -302,46 +368,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   infoVal: {
-    color: COLORS.textSecondary,
+    color: COLORS.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  emptyCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    marginTop: 20,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: COLORS.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  addNavigatorBtn: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  addNavigatorBtnText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '800',
+  roleBadge: {
+    color: COLORS.primaryLight,
+    backgroundColor: 'rgba(255, 122, 0, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

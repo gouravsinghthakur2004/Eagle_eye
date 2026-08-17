@@ -127,13 +127,47 @@ export const driverNavigatorService = {
         try {
           await AsyncStorage.setItem(userKey, JSON.stringify(updatedList));
         } catch {}
-        return updatedList;
       }
     } catch (remoteErr) {
       console.warn('[driverNavigatorService] Remote GET failed, using local:', remoteErr);
     }
 
-    return Array.from(profilesMap.values());
+    const allProfiles = Array.from(profilesMap.values());
+    // STRICT ENTITY ISOLATION: Guarantee that only the requested roleType is returned
+    if (roleType) {
+      return allProfiles.filter(
+        (p) => String(p.role_type || '').toLowerCase() === roleType.toLowerCase()
+      );
+    }
+    return allProfiles;
+  },
+
+  /**
+   * Search Profiles with Strict Entity Role Isolation
+   * Guarantees Driver search NEVER returns Navigators, and Navigator search NEVER returns Drivers.
+   */
+  searchProfiles: async (
+    query: string,
+    roleType: 'driver' | 'navigator',
+    userId?: string | number
+  ): Promise<DriverNavigatorProfile[]> => {
+    const trimmed = query.trim().toLowerCase();
+    if (trimmed.length < 2) return [];
+
+    // 1. Fetch strictly role-filtered profiles
+    const profiles = await driverNavigatorService.getProfiles(userId, roleType);
+
+    // 2. Strict query matching with role verification
+    return profiles.filter((p) => {
+      const isCorrectRole = String(p.role_type || '').toLowerCase() === roleType.toLowerCase();
+      if (!isCorrectRole) return false;
+
+      const nameMatch = p.full_name?.toLowerCase().includes(trimmed);
+      const nickMatch = p.race_nick_name?.toLowerCase().includes(trimmed);
+      const mobileMatch = p.mobile_no?.includes(trimmed);
+
+      return Boolean(nameMatch || nickMatch || mobileMatch);
+    });
   },
 
   /**
