@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { Header, InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
+import { Header, InputField, PrimaryButton, KeyboardAwareFormContainer, FileUploadInput } from '@/components';
 import { profileService, UserProfile } from '@/services/profileService';
+import { SelectedFile } from '@/utils/fileValidation';
 
 const STATS = [
   { label: 'Events', value: '42', icon: '🏁' },
@@ -33,6 +34,7 @@ export const DriverProfileScreen: React.FC = () => {
   const [editCity, setEditCity] = useState('');
   const [editState, setEditState] = useState('');
   const [editPincode, setEditPincode] = useState('');
+  const [selectedProfilePic, setSelectedProfilePic] = useState<SelectedFile | null>(null);
 
   const fetchProfile = async () => {
     try {
@@ -68,6 +70,7 @@ export const DriverProfileScreen: React.FC = () => {
         city: editCity,
         state: editState,
         pincode: editPincode,
+        profile_pic_file: selectedProfilePic,
       });
 
       Alert.alert('Success', res.message || 'Profile updated successfully.');
@@ -187,6 +190,12 @@ export const DriverProfileScreen: React.FC = () => {
             </View>
 
             <KeyboardAwareFormContainer style={styles.modalScroll}>
+              <FileUploadInput
+                label="Profile Photo (JPG / PNG)"
+                value={selectedProfilePic?.uri || profile?.profile_pic_url || profile?.profile_pic_path}
+                onFileSelected={(file: SelectedFile | null) => setSelectedProfilePic(file)}
+                icon="📷"
+              />
               <InputField label="Name" placeholder="Full name" value={editName} onChangeText={setEditName} icon="👤" />
               <InputField label="Contact" placeholder="Phone number" value={editContact} onChangeText={setEditContact} icon="📱" keyboardType="phone-pad" />
               <InputField label="Address" placeholder="Street address" value={editAddress} onChangeText={setEditAddress} icon="📍" />

@@ -12,4 +12,6 @@ export * from '../vehicles/VehicleFormModal';
 export * from './SearchSelectField';
 export * from './FormErrorBanner';
 export * from './KeyboardAwareFormContainer';
+export * from './FileUploadInput';
+export * from './DatePickerInput';
 

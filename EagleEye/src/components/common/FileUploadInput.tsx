@@ -114,41 +114,58 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
       return;
     }
 
-    launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: false }, (res) => {
-      if (res.didCancel || res.errorCode) {
-        if (res.errorMessage) console.warn('[Camera] Launch error:', res.errorMessage);
-        return;
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        saveToPhotos: false,
+      },
+      (res) => {
+        if (res.didCancel || res.errorCode) {
+          if (res.errorMessage) console.warn('[Camera] Launch error:', res.errorMessage);
+          return;
+        }
+        const asset = res.assets?.[0];
+        if (asset && asset.uri) {
+          handleProcessSelectedFile({
+            uri: asset.uri,
+            name: asset.fileName || `photo_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+            size: asset.fileSize || 500000,
+          });
+        }
       }
-      const asset = res.assets?.[0];
-      if (asset && asset.uri) {
-        handleProcessSelectedFile({
-          uri: asset.uri,
-          name: asset.fileName || `photo_${Date.now()}.jpg`,
-          type: asset.type || 'image/jpeg',
-          size: asset.fileSize || 500000,
-        });
-      }
-    });
+    );
   };
 
   // Launch Real Photo Gallery
   const handleLaunchGallery = () => {
     setModalVisible(false);
-    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (res) => {
-      if (res.didCancel || res.errorCode) {
-        if (res.errorMessage) console.warn('[Gallery] Launch error:', res.errorMessage);
-        return;
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      },
+      (res) => {
+        if (res.didCancel || res.errorCode) {
+          if (res.errorMessage) console.warn('[Gallery] Launch error:', res.errorMessage);
+          return;
+        }
+        const asset = res.assets?.[0];
+        if (asset && asset.uri) {
+          handleProcessSelectedFile({
+            uri: asset.uri,
+            name: asset.fileName || `gallery_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+            size: asset.fileSize || 500000,
+          });
+        }
       }
-      const asset = res.assets?.[0];
-      if (asset && asset.uri) {
-        handleProcessSelectedFile({
-          uri: asset.uri,
-          name: asset.fileName || `gallery_${Date.now()}.jpg`,
-          type: asset.type || 'image/jpeg',
-          size: asset.fileSize || 500000,
-        });
-      }
-    });
+    );
   };
 
   // Launch Native Document & File Picker (PDF / Files / Drive)
@@ -209,6 +226,7 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
       <View style={styles.labelRow}>
         <Text style={styles.label}>{label}</Text>
         {required && <Text style={styles.requiredAsterisk}> *</Text>}
+        <Text style={styles.recommendedBadge}>Recommended: up to 4 MB</Text>
       </View>
 
       {selectedFile ? (
@@ -229,7 +247,7 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
               </Text>
               <Text style={styles.fileSizeText}>
                 {fileValidation.formatFileSize(selectedFile.size)}
-                {selectedFile.isCompressed ? ' • Optimized (JPEG)' : ''}
+                {selectedFile.isCompressed ? ' • Optimized (JPEG)' : ' • Ready'}
               </Text>
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>✓ Selected & Verified</Text>
@@ -264,7 +282,7 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
             <Text style={styles.uploadTitle}>
               {isProcessing ? 'Optimizing file…' : `Upload ${label}`}
             </Text>
-            <Text style={styles.uploadSubtitle}>JPG, PNG or PDF • Max {maxSizeMB} MB</Text>
+            <Text style={styles.uploadSubtitle}>JPG, PNG, WEBP or PDF • Recommended: up to 4 MB</Text>
           </View>
 
           <View style={styles.browseBtn}>
@@ -345,6 +363,18 @@ const styles = StyleSheet.create({
   requiredAsterisk: {
     color: '#FF7A00',
     fontWeight: 'bold',
+  },
+  recommendedBadge: {
+    marginLeft: 'auto',
+    color: '#FF7A00',
+    fontSize: 10,
+    fontWeight: '800',
+    backgroundColor: 'rgba(255, 122, 0, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 122, 0, 0.25)',
   },
   uploadBox: {
     flexDirection: 'row',
