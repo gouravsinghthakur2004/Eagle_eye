@@ -126,8 +126,14 @@ export const TeamMembersScreen: React.FC = () => {
       cancelText: 'Cancel',
       isDestructive: true,
       onConfirm: async () => {
-        setDrivers((prev) => prev.filter((d) => String(d.id) !== String(driverId)));
-        showSuccess('Driver Removed', 'Driver has been removed from team list.');
+        try {
+          await driverNavigatorService.deleteProfile(driverId, userId);
+          setDrivers((prev) => prev.filter((d) => String(d.id) !== String(driverId)));
+          showSuccess('Driver Removed', 'Driver has been removed from team list.');
+          fetchProfiles();
+        } catch (err) {
+          console.warn('[TeamMembersScreen] Remove driver error:', err);
+        }
       },
     });
   };
@@ -141,8 +147,14 @@ export const TeamMembersScreen: React.FC = () => {
       cancelText: 'Cancel',
       isDestructive: true,
       onConfirm: async () => {
-        setNavigators((prev) => prev.filter((n) => String(n.id) !== String(navigatorId)));
-        showSuccess('Navigator Removed', 'Navigator has been removed from team list.');
+        try {
+          await driverNavigatorService.deleteProfile(navigatorId, userId);
+          setNavigators((prev) => prev.filter((n) => String(n.id) !== String(navigatorId)));
+          showSuccess('Navigator Removed', 'Navigator has been removed from team list.');
+          fetchProfiles();
+        } catch (err) {
+          console.warn('[TeamMembersScreen] Remove navigator error:', err);
+        }
       },
     });
   };

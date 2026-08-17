@@ -326,8 +326,16 @@ export const driverNavigatorService = {
     };
 
     // 4. Update user-scoped storage with strictly mapped profile (NO local device paths)
+    const finalProfileId = payload.id
+      ? String(payload.id)
+      : apiResponseData?.id
+      ? String(apiResponseData.id)
+      : apiResponseData?.driver_id
+      ? String(apiResponseData.driver_id)
+      : `profile_${sanitizedPayload.role_type || 'driver'}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
     const savedProfileObject: DriverNavigatorProfile = {
-      id: payload.id || (apiResponseData?.id ? String(apiResponseData.id) : `profile_${Date.now()}`),
+      id: finalProfileId,
       user_id: userId ? String(userId) : payload.user_id || '',
       role_type: (sanitizedPayload.role_type as 'driver' | 'navigator') || 'driver',
       full_name: sanitizedPayload.full_name,
@@ -362,12 +370,16 @@ export const driverNavigatorService = {
     try {
       const stored = await AsyncStorage.getItem(userKey);
       let list: DriverNavigatorProfile[] = stored ? JSON.parse(stored) : [];
-      const idx = list.findIndex(
-        (p) => String(p.id) === String(savedProfileObject.id)
-      );
-      if (idx >= 0) {
-        list[idx] = { ...list[idx], ...savedProfileObject };
+      if (payload.id) {
+        // Edit flow: Update only target record
+        const idx = list.findIndex((p) => String(p.id) === String(payload.id));
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...savedProfileObject };
+        } else {
+          list.push(savedProfileObject);
+        }
       } else {
+        // Add flow: Accumulate new driver/navigator record without overwriting previous ones
         list.push(savedProfileObject);
       }
       await AsyncStorage.setItem(userKey, JSON.stringify(list));
@@ -384,8 +396,45 @@ export const driverNavigatorService = {
   },
 
   /**
+   * DELETE /driver/delete/{id}
+   */
+  deleteProfile: async (
+    id: string | number,
+    userId?: string | number
+  ): Promise<{ success: boolean; message?: string }> => {
+    const userKey = getUserStorageKey(userId);
+
+    const deleteEndpoints = [
+      `/driver/delete/${id}`,
+      `/driver_navigator/delete/${id}`,
+      `/drivernavigator/delete/${id}`,
+      `/driver/${id}`,
+    ];
+
+    for (const ep of deleteEndpoints) {
+      try {
+        await client.post(ep);
+        break;
+      } catch (err: any) {
+        if (err?.response?.status === 404) continue;
+      }
+    }
+
+    try {
+      const stored = await AsyncStorage.getItem(userKey);
+      if (stored) {
+        const list: DriverNavigatorProfile[] = JSON.parse(stored);
+        const filtered = list.filter((p) => String(p.id) !== String(id));
+        await AsyncStorage.setItem(userKey, JSON.stringify(filtered));
+      }
+    } catch {}
+
+    return { success: true, message: 'Profile removed successfully' };
+  },
+
+  /**
    * POST /driver/save (or batch endpoints)
-   * Sends drivers[] and navigators[] array payloads to backend and updates local storage.
+   * Sends drivers[] and navigators[] array payloads to backend and merges with local storage.
    */
   saveAllProfiles: async (
     data: {
@@ -434,10 +483,10 @@ export const driverNavigatorService = {
       }
     }
 
-    // 3. Build and store full list in AsyncStorage
-    const allProfiles: DriverNavigatorProfile[] = [
+    // 3. Build and merge list in AsyncStorage without wiping previous records
+    const newProfiles: DriverNavigatorProfile[] = [
       ...(data.drivers || []).map((d, i) => ({
-        id: d.id || `driver_${Date.now()}_${i}`,
+        id: d.id || `driver_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
         user_id: userId ? String(userId) : d.user_id || '',
         role_type: 'driver' as const,
         full_name: String(d.full_name || ''),
@@ -448,7 +497,7 @@ export const driverNavigatorService = {
         updated_at: new Date().toISOString(),
       }) as DriverNavigatorProfile),
       ...(data.navigators || []).map((n, i) => ({
-        id: n.id || `navigator_${Date.now()}_${i}`,
+        id: n.id || `navigator_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
         user_id: userId ? String(userId) : n.user_id || '',
         role_type: 'navigator' as const,
         full_name: String(n.full_name || ''),
@@ -461,7 +510,16 @@ export const driverNavigatorService = {
     ];
 
     try {
-      await AsyncStorage.setItem(userKey, JSON.stringify(allProfiles));
+      const stored = await AsyncStorage.getItem(userKey);
+      const existingList: DriverNavigatorProfile[] = stored ? JSON.parse(stored) : [];
+      const profileMap = new Map<string, DriverNavigatorProfile>();
+      for (const p of existingList) {
+        if (p.id) profileMap.set(String(p.id), p);
+      }
+      for (const p of newProfiles) {
+        if (p.id) profileMap.set(String(p.id), p);
+      }
+      await AsyncStorage.setItem(userKey, JSON.stringify(Array.from(profileMap.values())));
     } catch (storageErr) {
       console.warn('[driverNavigatorService] Local write warning:', storageErr);
     }

@@ -130,41 +130,35 @@ export const isEventResultAvailable = (event: any): boolean => {
   return info.isResultAvailable;
 };
 
-/**
- * Sorts event array by strict priority:
- * Priority 1: Upcoming (nearest start date first)
- * Priority 2: Live (start date ascending)
- * Priority 3: Completed (most recently completed first)
- */
 export const sortEvents = <T extends { event_start_date?: string | null; event_end_date?: string | null }>(
   events: T[]
 ): T[] => {
   if (!events || events.length === 0) return [];
 
-  const upcoming: T[] = [];
   const live: T[] = [];
+  const upcoming: T[] = [];
   const completed: T[] = [];
 
   events.forEach((item) => {
     const info = getEventStatusInfo(item.event_start_date, item.event_end_date);
-    if (info.status === 'upcoming') {
-      upcoming.push(item);
-    } else if (info.status === 'live') {
+    if (info.status === 'live') {
       live.push(item);
+    } else if (info.status === 'upcoming') {
+      upcoming.push(item);
     } else {
       completed.push(item);
     }
   });
 
-  // Priority 1: Upcoming sorted by nearest start date ascending
-  upcoming.sort((a, b) => {
+  // Priority 1: Live sorted by start date ascending
+  live.sort((a, b) => {
     const dA = a.event_start_date ? new Date(a.event_start_date.replace(/-/g, '/')).getTime() : 0;
     const dB = b.event_start_date ? new Date(b.event_start_date.replace(/-/g, '/')).getTime() : 0;
     return dA - dB;
   });
 
-  // Priority 2: Live sorted by start date ascending
-  live.sort((a, b) => {
+  // Priority 2: Upcoming sorted by nearest start date ascending
+  upcoming.sort((a, b) => {
     const dA = a.event_start_date ? new Date(a.event_start_date.replace(/-/g, '/')).getTime() : 0;
     const dB = b.event_start_date ? new Date(b.event_start_date.replace(/-/g, '/')).getTime() : 0;
     return dA - dB;
@@ -181,5 +175,5 @@ export const sortEvents = <T extends { event_start_date?: string | null; event_e
     return dB - dA;
   });
 
-  return [...upcoming, ...live, ...completed];
+  return [...live, ...upcoming, ...completed];
 };

@@ -60,9 +60,30 @@ export const eventService = {
       const response = await client.get<any>(ENDPOINTS.EVENTS.LIST);
       if (response.data) {
         const body = response.data;
-        const list = body.events || body.data || (Array.isArray(body) ? body : null);
-        if (Array.isArray(list) && list.length > 0) {
-          return sortEvents(list);
+        let list: any[] = [];
+        if (Array.isArray(body)) {
+          list = body;
+        } else if (Array.isArray(body.events)) {
+          list = body.events;
+        } else if (Array.isArray(body.data?.events)) {
+          list = body.data.events;
+        } else if (Array.isArray(body.data)) {
+          list = body.data;
+        } else if (Array.isArray(body.result)) {
+          list = body.result;
+        }
+
+        if (list.length > 0) {
+          const validEvents = list
+            .filter((e) => e && (e.is_deleted === undefined || e.is_deleted === 0 || e.is_deleted === '0' || e.is_deleted === false))
+            .map((e) => ({
+              ...e,
+              id: String(e.id || e.event_id || `event_${Date.now()}`),
+            }));
+
+          if (validEvents.length > 0) {
+            return sortEvents(validEvents);
+          }
         }
       }
     } catch (error: any) {

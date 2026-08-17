@@ -329,8 +329,16 @@ export const vehicleService = {
     };
 
     // 4. Update user-scoped storage with strictly mapped vehicle profile (NO local device paths)
+    const finalVehicleId = payload.id
+      ? String(payload.id)
+      : apiResponseData?.vehicle_id
+      ? String(apiResponseData.vehicle_id)
+      : apiResponseData?.id
+      ? String(apiResponseData.id)
+      : `vehicle_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
     const savedVehicleObject: VehicleProfile = {
-      id: payload.id || (apiResponseData?.vehicle_id ? String(apiResponseData.vehicle_id) : apiResponseData?.id ? String(apiResponseData.id) : `vehicle_${Date.now()}`),
+      id: finalVehicleId,
       user_id: userId ? String(userId) : payload.user_id || '',
       vehicle_rc_no: String(sanitizedPayload.vehicle_rc_no || ''),
       vehicle_owner_name: String(sanitizedPayload.vehicle_owner_name || ''),
@@ -347,6 +355,8 @@ export const vehicleService = {
       insurance_validity: String(sanitizedPayload.insurance_validity || ''),
       insurance_company: String(sanitizedPayload.insurance_company || ''),
       insurance_doc_upload: resolveVehicleServerPath('insurance_doc_upload', ['insurance_upload', 'insurance_document', 'insurance_doc']),
+      fitness_upload: resolveVehicleServerPath('fitness_upload', ['fitness_doc_upload', 'fitness_doc', 'fitness_document']),
+      fitness_validity: String(sanitizedPayload.fitness_validity || ''),
       vehicle_img_front: resolveVehicleServerPath('vehicle_img_front', ['vehicle_pic_upload', 'vehicle_photo', 'vehicle_pic']),
       vehicle_img_back: resolveVehicleServerPath('vehicle_img_back', ['vehicle_photo_back']),
       vehicle_img_left: resolveVehicleServerPath('vehicle_img_left', ['vehicle_photo_left']),
@@ -359,9 +369,18 @@ export const vehicleService = {
 
     try {
       const existing = await vehicleService.getVehicles(userId);
-      const idx = existing.findIndex((v) => String(v.id) === String(savedVehicleObject.id));
-      if (idx >= 0) existing[idx] = savedVehicleObject;
-      else existing.push(savedVehicleObject);
+      if (payload.id) {
+        // Edit flow: Update only matching record
+        const idx = existing.findIndex((v) => String(v.id) === String(payload.id));
+        if (idx >= 0) {
+          existing[idx] = savedVehicleObject;
+        } else {
+          existing.push(savedVehicleObject);
+        }
+      } else {
+        // Add flow: Accumulate new vehicle without overwriting previous records
+        existing.push(savedVehicleObject);
+      }
       await AsyncStorage.setItem(userKey, JSON.stringify(existing));
     } catch (storageErr) {
       console.warn('[vehicleService] Local write warning:', storageErr);
