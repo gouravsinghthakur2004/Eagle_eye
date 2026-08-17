@@ -7,7 +7,6 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
@@ -15,16 +14,17 @@ import { Header } from '@/components/layout/Header';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { vehicleService } from '@/services/vehicleService';
 import { VehicleProfile } from '@/types';
+import { VehicleFormModal } from '@/components/vehicles/VehicleFormModal';
 
 export const SelectVehicleScreen: React.FC = () => {
-  const { goBack, navigate, user, selectVehicleForJoin, currentScreen } = useAppNavigation();
+  const { goBack, user, selectVehicleForJoin, currentScreen } = useAppNavigation();
   const userId = user?.id || (user as any)?.user_id;
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
   const [vehicles, setVehicles] = useState<VehicleProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
 
   // Debounce search query 400ms
   useEffect(() => {
@@ -43,7 +43,6 @@ export const SelectVehicleScreen: React.FC = () => {
       console.warn('[SelectVehicleScreen] Fetch error:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [userId]);
 
@@ -53,11 +52,6 @@ export const SelectVehicleScreen: React.FC = () => {
       fetchVehicles();
     }
   }, [currentScreen, fetchVehicles]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchVehicles();
-  };
 
   const isQueryValid = debouncedQuery.trim().length >= 2;
 
@@ -74,8 +68,14 @@ export const SelectVehicleScreen: React.FC = () => {
     selectVehicleForJoin(vehicle);
   };
 
-  const handleAddVehicle = () => {
-    navigate('Vehicles');
+  const handleOpenAddModal = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const handleVehicleSaved = (savedVehicle: VehicleProfile) => {
+    selectVehicleForJoin(savedVehicle);
+    setVehicles((prev) => [savedVehicle, ...prev]);
+    fetchVehicles();
   };
 
   return (
@@ -104,7 +104,7 @@ export const SelectVehicleScreen: React.FC = () => {
       </View>
 
       {/* Main List / Loading / Prompt / Empty */}
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Searching registered vehicles…</Text>
@@ -116,7 +116,7 @@ export const SelectVehicleScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>
             Type at least 2 characters of the vehicle registration/number plate (e.g. MP09CD0186) to search.
           </Text>
-          <TouchableOpacity style={styles.addVehicleBtn} onPress={handleAddVehicle}>
+          <TouchableOpacity style={styles.addVehicleBtn} onPress={handleOpenAddModal}>
             <Text style={styles.addVehicleBtnText}>+ Add New Vehicle</Text>
           </TouchableOpacity>
         </View>
@@ -125,13 +125,7 @@ export const SelectVehicleScreen: React.FC = () => {
           data={filteredVehicles}
           keyExtractor={(item, index) => String(item.id || index)}
           contentContainerStyle={styles.listPadding}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={COLORS.primary}
-            />
-          }
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>🏎️</Text>
@@ -139,7 +133,7 @@ export const SelectVehicleScreen: React.FC = () => {
               <Text style={styles.emptySubtitle}>
                 No vehicle matching "{searchQuery}" was found in your registered garage.
               </Text>
-              <TouchableOpacity style={styles.addVehicleBtn} onPress={handleAddVehicle}>
+              <TouchableOpacity style={styles.addVehicleBtn} onPress={handleOpenAddModal}>
                 <Text style={styles.addVehicleBtnText}>+ Add New Vehicle</Text>
               </TouchableOpacity>
             </View>
@@ -185,6 +179,13 @@ export const SelectVehicleScreen: React.FC = () => {
           )}
         />
       )}
+
+      {/* Vehicle Add Modal */}
+      <VehicleFormModal
+        visible={isAddModalOpen}
+        onSave={handleVehicleSaved}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -226,6 +227,7 @@ const styles = StyleSheet.create({
   clearBtnText: {
     color: COLORS.textMuted,
     fontSize: 14,
+    fontWeight: '700',
   },
   centered: {
     flex: 1,
@@ -242,92 +244,24 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  vehicleItemCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryGlow,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  carIcon: {
-    fontSize: 20,
-  },
-  nameContainer: {
-    flex: 1,
-  },
-  vehicleNickName: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  vehicleMakeModel: {
-    color: COLORS.accentOrange,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  selectBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  selectBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
-  },
-  infoLabel: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  infoVal: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
   emptyCard: {
+    margin: 20,
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    padding: 30,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    marginTop: 20,
   },
   emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
+    fontSize: 44,
+    marginBottom: 16,
   },
   emptyTitle: {
     color: COLORS.white,
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
@@ -341,11 +275,83 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   addVehicleBtnText: {
-    color: COLORS.white,
+    color: '#000000',
     fontSize: 14,
+    fontWeight: '900',
+  },
+  vehicleItemCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  carIcon: {
+    fontSize: 22,
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  vehicleNickName: {
+    color: COLORS.white,
+    fontSize: 16,
     fontWeight: '800',
+  },
+  vehicleMakeModel: {
+    color: COLORS.accentOrange,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  selectBadge: {
+    backgroundColor: 'rgba(255, 122, 0, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  selectBadgeText: {
+    color: COLORS.primaryLight,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+  },
+  infoLabel: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  infoVal: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

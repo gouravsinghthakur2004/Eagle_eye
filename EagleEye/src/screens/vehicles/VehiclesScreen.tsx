@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
@@ -14,19 +13,17 @@ import { Header } from '@/components/layout/Header';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { VehicleProfile } from '@/types';
 import { vehicleService } from '@/services/vehicleService';
-import { VehicleWizard } from '@/components/common/VehicleWizard';
+import { VehicleFormModal } from '@/components/vehicles/VehicleFormModal';
 import { useNotification } from '@/hooks/useNotification';
 
 export const VehiclesScreen: React.FC = () => {
-  const { user } = useAppNavigation();
+  const { user, selectVehicleForJoin } = useAppNavigation();
   const { showSuccess, showConfirm } = useNotification();
-  const userId = user?.id;
+  const userId = user?.id || (user as any)?.user_id;
 
   const [vehicles, setVehicles] = useState<VehicleProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
-  const [wizardMode, setWizardMode] = useState<'add' | 'edit'>('add');
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedVehicleToEdit, setSelectedVehicleToEdit] = useState<VehicleProfile | null>(null);
 
   const fetchVehicles = useCallback(async () => {
@@ -44,7 +41,6 @@ export const VehiclesScreen: React.FC = () => {
       console.warn('[VehiclesScreen] Fetch error:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [userId]);
 
@@ -52,21 +48,33 @@ export const VehiclesScreen: React.FC = () => {
     fetchVehicles();
   }, [fetchVehicles]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchVehicles();
-  };
-
   const handleOpenAddVehicle = () => {
     setSelectedVehicleToEdit(null);
-    setWizardMode('add');
-    setIsWizardOpen(true);
+    setIsModalOpen(true);
   };
 
   const handleOpenEditVehicle = (vehicle: VehicleProfile) => {
     setSelectedVehicleToEdit(vehicle);
-    setWizardMode('edit');
-    setIsWizardOpen(true);
+    setIsModalOpen(true);
+  };
+
+  const handleVehicleSaved = (savedVehicle: VehicleProfile) => {
+    selectVehicleForJoin(savedVehicle);
+    setVehicles((prev) => {
+      const idx = prev.findIndex((v) => String(v.id) === String(savedVehicle.id));
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = savedVehicle;
+        return copy;
+      }
+      return [...prev, savedVehicle];
+    });
+    fetchVehicles();
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedVehicleToEdit(null);
   };
 
   const handleRemoveVehicle = (vehicleId: string | number) => {
@@ -82,6 +90,7 @@ export const VehiclesScreen: React.FC = () => {
           const res = await vehicleService.deleteVehicle(vehicleId, userId);
           if (res.success) {
             showSuccess('Vehicle Deleted', res.message || 'Vehicle deleted successfully');
+            setVehicles((prev) => prev.filter((v) => String(v.id) !== String(vehicleId)));
             fetchVehicles();
           }
         } catch (err) {
@@ -90,34 +99,6 @@ export const VehiclesScreen: React.FC = () => {
       },
     });
   };
-
-  const handleWizardClose = () => {
-    setIsWizardOpen(false);
-    setSelectedVehicleToEdit(null);
-  };
-
-  const handleWizardSuccess = () => {
-    handleWizardClose();
-    fetchVehicles();
-  };
-
-  if (isWizardOpen) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <Header
-          title={wizardMode === 'edit' ? 'Edit Vehicle' : 'Register Vehicle'}
-          showBack
-          onBack={handleWizardClose}
-        />
-        <VehicleWizard
-          mode={wizardMode}
-          initialVehicle={selectedVehicleToEdit}
-          onSuccess={handleWizardSuccess}
-          onCancel={handleWizardClose}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -132,13 +113,6 @@ export const VehiclesScreen: React.FC = () => {
         <ScrollView
           style={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-            />
-          }
         >
           {/* Vehicles Count Banner */}
           <View style={styles.counterBanner}>
@@ -169,12 +143,15 @@ export const VehiclesScreen: React.FC = () => {
                 <View style={styles.tableHeaderRow}>
                   <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>VEHICLE NAME</Text>
                   <Text style={[styles.tableHeaderCell, { flex: 1.8 }]}>PLATE / RC NO.</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'right' }]}>ACTIONS</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>ACTIONS</Text>
                 </View>
 
                 {/* Table Data Rows */}
                 {vehicles.map((v, idx) => {
-                  const vehicleName = v.vehicle_nick_name || `${v.vehicle_manufacturing || ''} ${v.vehicle_model || ''}`.trim() || `Vehicle #${idx + 1}`;
+                  const vehicleName =
+                    v.vehicle_nick_name ||
+                    `${v.vehicle_manufacturing || ''} ${v.vehicle_model || ''}`.trim() ||
+                    `Vehicle #${idx + 1}`;
                   const makeModelText = `${v.vehicle_manufacturing || ''} ${v.vehicle_model || ''}`.trim();
 
                   return (
@@ -231,6 +208,14 @@ export const VehiclesScreen: React.FC = () => {
           )}
         </ScrollView>
       )}
+
+      {/* Complete Production 4-Step Vehicle Form Modal */}
+      <VehicleFormModal
+        visible={isModalOpen}
+        initialValues={selectedVehicleToEdit}
+        onSave={handleVehicleSaved}
+        onClose={handleModalClose}
+      />
     </SafeAreaView>
   );
 };
@@ -305,154 +290,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   registerBtnText: {
-    color: COLORS.white,
+    color: '#000000',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   profileContainer: {
     gap: 16,
     paddingBottom: 40,
-  },
-  heroCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  heroHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  heroBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  heroBadgeText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  editHeaderBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  editHeaderBtnText: {
-    color: COLORS.accentOrange,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  vehicleNickName: {
-    color: COLORS.white,
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  vehicleMakeModel: {
-    color: COLORS.accentOrange,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  sectionTitle: {
-    color: COLORS.accentOrange,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  photoBox: {
-    width: 140,
-    marginRight: 12,
-  },
-  photoImg: {
-    width: 140,
-    height: 100,
-    borderRadius: 10,
-    marginBottom: 4,
-  },
-  photoTag: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  gridItem: {
-    width: '46%',
-    backgroundColor: COLORS.background,
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  gridLabel: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  gridVal: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  dataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.surfaceBorder,
-  },
-  dataLabel: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dataVal: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  docBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: COLORS.accentOrange,
-  },
-  docBadgeText: {
-    color: COLORS.accentOrange,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  infoText: {
-    color: COLORS.white,
-    fontSize: 14,
-    lineHeight: 20,
   },
   bottomEditBtn: {
     backgroundColor: COLORS.surface,

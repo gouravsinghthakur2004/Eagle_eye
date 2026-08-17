@@ -8,6 +8,7 @@ export * from '../drivers/DriverCard';
 export * from '../drivers/NavigatorCard';
 export * from '../drivers/DriverFormModal';
 export * from '../drivers/NavigatorFormModal';
+export * from '../vehicles/VehicleFormModal';
 export * from './SearchSelectField';
 export * from './FormErrorBanner';
 export * from './KeyboardAwareFormContainer';
