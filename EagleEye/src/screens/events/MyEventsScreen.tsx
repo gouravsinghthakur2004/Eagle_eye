@@ -30,7 +30,7 @@ const formatDateOnly = (dateStr?: string | null): string => {
 
 export const MyEventsScreen: React.FC = () => {
   const { goBack, navigate, openEventDetails } = useAppNavigation();
-  const { showSuccess, showError } = useNotification();
+  const { showError } = useNotification();
 
   const [myEvents, setMyEvents] = useState<MyEventItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);

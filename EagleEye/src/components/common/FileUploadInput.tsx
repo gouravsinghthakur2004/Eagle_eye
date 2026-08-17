@@ -49,7 +49,7 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
   label,
   value,
   onFileSelected,
-  allowedTypes = ['image', 'pdf'],
+  allowedTypes: _allowedTypes = ['image', 'pdf'],
   maxSizeMB = 5,
   icon = '📎',
   required = false,
@@ -72,10 +72,10 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
           size: isPdf ? 1.2 * 1024 * 1024 : 350 * 1024,
         });
       }
-    } else if (!value && selectedFile) {
+    } else {
       setSelectedFile(null);
     }
-  }, [value]);
+  }, [value, label]);
 
   const handleProcessSelectedFile = async (rawFile: SelectedFile) => {
     setErrorMessage(null);
@@ -158,7 +158,7 @@ export const FileUploadInputComponent: React.FC<FileUploadInputProps> = ({
       let DocumentPicker: any;
       try {
         DocumentPicker = require('react-native-document-picker').default;
-      } catch (e) {}
+      } catch {}
 
       if (DocumentPicker && typeof DocumentPicker.pickSingle === 'function') {
         const res = await DocumentPicker.pickSingle({

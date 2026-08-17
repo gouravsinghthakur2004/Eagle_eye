@@ -3,15 +3,12 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { InputField, PrimaryButton } from '@/components';
+import { InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 import { validateName, validateEmail, validatePhone } from '@/utils/formValidation';
@@ -73,7 +70,7 @@ export const SignupScreen: React.FC = () => {
 
     try {
       setLoading(true);
-      const res = await AuthService.register({
+      await AuthService.register({
         name: trimmedName,
         username: trimmedUsername,
         email: trimmedEmail,
@@ -115,121 +112,116 @@ export const SignupScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Back Header */}
-          <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-            <Text style={styles.backIcon}>←</Text>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
+        {/* Back Header */}
+        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+
+        <View style={styles.headerSection}>
+          <Text style={styles.headerTitle}>Create Account</Text>
+          <Text style={styles.headerSubtitle}>
+            Join EagleEye to access real-time rally & telemetry feeds.
+          </Text>
+        </View>
+
+        {/* Form */}
+        <View style={styles.formCard}>
+          <InputField
+            label="Full Name"
+            placeholder="e.g. John Doe"
+            value={name}
+            onChangeText={setName}
+            icon="👤"
+            autoCapitalize="words"
+          />
+
+          <InputField
+            label="Username"
+            placeholder="e.g. johndoe"
+            value={username}
+            onChangeText={setUsername}
+            icon="🏷️"
+            autoCapitalize="none"
+          />
+
+          <InputField
+            label="Email Address"
+            placeholder="e.g. john@example.com"
+            value={email}
+            onChangeText={setEmail}
+            icon="✉️"
+            keyboardType="email-address"
+          />
+
+          <InputField
+            label="Password"
+            placeholder="••••••••"
+            value={password}
+            onChangeText={setPassword}
+            icon="🔒"
+            isPassword
+          />
+
+          <InputField
+            label="Contact Number"
+            placeholder="e.g. 9876543210"
+            value={contact}
+            onChangeText={setContact}
+            icon="📱"
+            keyboardType="phone-pad"
+          />
+
+          <InputField
+            label="Address"
+            placeholder="Street address"
+            value={address}
+            onChangeText={setAddress}
+            icon="📍"
+          />
+
+          <InputField
+            label="City"
+            placeholder="City"
+            value={city}
+            onChangeText={setCity}
+            icon="🏙️"
+          />
+
+          <InputField
+            label="State"
+            placeholder="State"
+            value={state}
+            onChangeText={setState}
+            icon="🗺️"
+          />
+
+          <InputField
+            label="Pincode"
+            placeholder="Pincode"
+            value={pincode}
+            onChangeText={setPincode}
+            icon="📮"
+            keyboardType="number-pad"
+          />
+
+          <PrimaryButton
+            title={loading ? "Registering..." : "Register"}
+            icon="➔"
+            onPress={handleRegister}
+            disabled={loading}
+            style={styles.submitBtn}
+          />
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footerRow}>
+          <Text style={styles.footerText}>Already have an account? </Text>
+          <TouchableOpacity onPress={() => navigate('Login')}>
+            <Text style={styles.loginLink}>Login</Text>
           </TouchableOpacity>
-
-          <View style={styles.headerSection}>
-            <Text style={styles.headerTitle}>Create Account</Text>
-            <Text style={styles.headerSubtitle}>
-              Join EagleEye to access real-time rally & telemetry feeds.
-            </Text>
-          </View>
-
-          {/* Form */}
-          <View style={styles.formCard}>
-            <InputField
-              label="Full Name"
-              placeholder="e.g. John Doe"
-              value={name}
-              onChangeText={setName}
-              icon="👤"
-              autoCapitalize="words"
-            />
-
-            <InputField
-              label="Username"
-              placeholder="e.g. johndoe"
-              value={username}
-              onChangeText={setUsername}
-              icon="🏷️"
-              autoCapitalize="none"
-            />
-
-            <InputField
-              label="Email Address"
-              placeholder="e.g. john@example.com"
-              value={email}
-              onChangeText={setEmail}
-              icon="✉️"
-              keyboardType="email-address"
-            />
-
-            <InputField
-              label="Password"
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              icon="🔒"
-              isPassword
-            />
-
-            <InputField
-              label="Contact Number"
-              placeholder="e.g. 9876543210"
-              value={contact}
-              onChangeText={setContact}
-              icon="📱"
-              keyboardType="phone-pad"
-            />
-
-            <InputField
-              label="Address"
-              placeholder="Street address"
-              value={address}
-              onChangeText={setAddress}
-              icon="📍"
-            />
-
-            <InputField
-              label="City"
-              placeholder="City"
-              value={city}
-              onChangeText={setCity}
-              icon="🏙️"
-            />
-
-            <InputField
-              label="State"
-              placeholder="State"
-              value={state}
-              onChangeText={setState}
-              icon="🗺️"
-            />
-
-            <InputField
-              label="Pincode"
-              placeholder="Pincode"
-              value={pincode}
-              onChangeText={setPincode}
-              icon="📮"
-              keyboardType="number-pad"
-            />
-
-            <PrimaryButton
-              title={loading ? "Registering..." : "Register"}
-              icon="➔"
-              onPress={handleRegister}
-              disabled={loading}
-              style={styles.submitBtn}
-            />
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footerRow}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigate('Login')}>
-              <Text style={styles.loginLink}>Login</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

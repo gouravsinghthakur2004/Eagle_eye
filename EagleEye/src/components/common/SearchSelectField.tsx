@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -91,7 +91,7 @@ export const SearchSelectField: React.FC<SearchSelectFieldProps> = ({
           setResults(items);
           setHasSearched(true);
         }
-      } catch (err) {
+      } catch {
         if (isCurrent) {
           setResults([]);
           setHasSearched(true);

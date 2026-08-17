@@ -3,13 +3,12 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { InputField, PrimaryButton } from '@/components';
+import { InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 
@@ -33,7 +32,7 @@ export const SetPasswordScreen: React.FC = () => {
         ]
       );
     }
-  }, [resetEmail, resetOtp]);
+  }, [resetEmail, resetOtp, navigate]);
 
   const getStrengthLevel = () => {
     if (newPassword.length === 0) return { label: 'Enter Password', level: 0, color: COLORS.surfaceBorder };
@@ -91,7 +90,7 @@ export const SetPasswordScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
@@ -151,7 +150,7 @@ export const SetPasswordScreen: React.FC = () => {
             style={styles.submitBtn}
           />
         </View>
-      </ScrollView>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

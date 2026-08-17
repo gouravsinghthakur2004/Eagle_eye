@@ -150,7 +150,7 @@ export const eventService = {
       if (response.data && response.data.event) {
         return response.data.event;
       }
-    } catch (e) {}
+    } catch {}
 
     const allEvents = await eventService.getEvents();
     return allEvents.find((e) => String(e.id) === String(eventId)) || allEvents[0] || null;

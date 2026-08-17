@@ -9,7 +9,7 @@ interface DriverCardProps {
   onRemove?: (id: string | number) => void;
 }
 
-export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit }) => {
+export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit, onRemove }) => {
   return (
     <View style={styles.tableRow}>
       {/* Driver Name Column */}
@@ -36,6 +36,11 @@ export const DriverCard: React.FC<DriverCardProps> = ({ driver, onEdit }) => {
         <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(driver)}>
           <Text style={styles.editBtnText}>Edit</Text>
         </TouchableOpacity>
+        {onRemove && driver.id !== undefined && (
+          <TouchableOpacity style={styles.removeBtn} onPress={() => onRemove(driver.id!)}>
+            <Text style={styles.removeBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -91,6 +96,20 @@ const styles = StyleSheet.create({
   },
   editBtnText: {
     color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  removeBtn: {
+    backgroundColor: 'rgba(255, 68, 68, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    marginLeft: 6,
+  },
+  removeBtnText: {
+    color: COLORS.error,
     fontSize: 11,
     fontWeight: '800',
   },

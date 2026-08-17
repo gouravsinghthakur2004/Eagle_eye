@@ -5,8 +5,6 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
-  FlatList,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -23,7 +21,7 @@ import { NavigatorFormModal } from '@/components/drivers/NavigatorFormModal';
 import { useNotification } from '@/hooks/useNotification';
 
 export const TeamMembersScreen: React.FC = () => {
-  const { goBack, navigate, user, selectDriverForJoin, selectNavigatorForJoin } = useAppNavigation();
+  const { goBack, user, selectDriverForJoin, selectNavigatorForJoin } = useAppNavigation();
   const { showSuccess, showConfirm } = useNotification();
 
   const userId = user?.id || (user as any)?.user_id;
@@ -215,6 +213,7 @@ export const TeamMembersScreen: React.FC = () => {
                     key={String(driver.id)}
                     driver={driver}
                     onEdit={handleOpenEditDriver}
+                    onRemove={handleRemoveDriver}
                   />
                 ))}
               </View>
@@ -255,6 +254,7 @@ export const TeamMembersScreen: React.FC = () => {
                     key={String(navigator.id)}
                     navigator={navigator}
                     onEdit={handleOpenEditNavigator}
+                    onRemove={handleRemoveNavigator}
                   />
                 ))}
               </View>

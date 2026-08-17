@@ -3,13 +3,11 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { InputField, PrimaryButton } from '@/components';
+import { InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 
@@ -57,7 +55,7 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
@@ -69,7 +67,6 @@ export const LoginScreen: React.FC = () => {
             Log in to access live race telemetry, leaderboards & driver stats.
           </Text>
         </View>
-
 
         <View style={styles.card}>
           <InputField
@@ -109,7 +106,7 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.signupLink}>Sign Up</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

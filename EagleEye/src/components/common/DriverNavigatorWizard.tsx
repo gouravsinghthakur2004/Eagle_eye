@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   TextInput,
   Keyboard,
 } from 'react-native';
@@ -17,12 +15,12 @@ import { PrimaryButton } from './PrimaryButton';
 import { SecondaryButton } from './SecondaryButton';
 import { DatePickerInput } from './DatePickerInput';
 import { FileUploadInput } from './FileUploadInput';
+import { KeyboardAwareFormContainer, KeyboardAwareFormContainerRef } from './KeyboardAwareFormContainer';
 import { useDriverNavigatorDraft } from '@/hooks/useDriverNavigatorDraft';
 import { DriverNavigatorProfile } from '@/types';
 import { RoleType } from '@/hooks/useDriverNavigatorProfile';
 import { SelectedFile } from '@/utils/fileValidation';
 import { fileCompression } from '@/utils/fileCompression';
-import { useAppNavigation } from '@/context/NavigationContext';
 
 interface DriverNavigatorEntry extends Partial<DriverNavigatorProfile> {
   tempId: string;
@@ -116,21 +114,20 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
   initialNavigators,
   initialValues,
   activeRole,
-  isProfileAdded,
+  isProfileAdded: _isProfileAdded,
   onSubmit,
   onCancel,
   loading = false,
 }) => {
-  const { draftData, draftStep, showRestoredToast, saveDraft, clearDraft } =
+  const { draftStep, showRestoredToast, saveDraft, clearDraft } =
     useDriverNavigatorDraft(activeRole, initialValues);
 
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     Keyboard.dismiss();
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      formContainerRef.current?.scrollTo({ y: 0, animated: true });
     }, 60);
     return () => clearTimeout(timer);
   }, [currentStep]);
@@ -171,6 +168,7 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
   } | null>(null);
 
   const firstInputRef = useRef<TextInput>(null);
+  const formContainerRef = useRef<KeyboardAwareFormContainerRef>(null);
 
   // Sync initial or draft values
   useEffect(() => {
@@ -273,7 +271,6 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
     }
   };
 
-  const roleLabel = activeRole === 'driver' ? 'Driver' : 'Navigator';
   const progressPercent = Math.round((currentStep / TOTAL_STEPS) * 100);
 
   const validateCurrentStep = (): boolean => {
@@ -406,7 +403,7 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
       });
 
       await clearDraft();
-      const success = await onSubmit({
+      await onSubmit({
         drivers: processedDrivers,
         navigators: processedNavigators,
       });
@@ -437,10 +434,7 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.keyboardContainer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.keyboardContainer}>
       {/* Toast Notification Banner */}
       {showRestoredToast && (
         <View style={styles.toastBanner}>
@@ -534,11 +528,11 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
       </View>
 
       {/* Form Content Body */}
-      <ScrollView
-        ref={scrollViewRef}
+      <KeyboardAwareFormContainer
+        ref={formContainerRef}
         style={styles.stepScrollContent}
         contentContainerStyle={styles.stepInnerPadding}
-        showsVerticalScrollIndicator={false}
+        extraScrollHeight={120}
       >
         {/* Step 1: Personal & Racing Identity */}
         {currentStep === 1 && (
@@ -1051,28 +1045,28 @@ export const DriverNavigatorWizard: React.FC<DriverNavigatorWizardProps> = ({
             ))}
           </View>
         )}
-      </ScrollView>
 
-      {/* Sticky Bottom Navigation Footer */}
-      <View style={styles.stickyFooterCard}>
-        <View style={styles.footerBtnGroup}>
-          <View style={styles.footerBackWrapper}>
-            <SecondaryButton title={currentStep === 1 ? 'Cancel' : 'Back'} onPress={handleBack} disabled={loading} />
-          </View>
-          <View style={styles.footerNextWrapper}>
-            {currentStep < TOTAL_STEPS ? (
-              <PrimaryButton title="Next Step →" onPress={handleNext} disabled={loading} />
-            ) : (
-              <PrimaryButton
-                title={loading ? 'Submitting...' : `Submit Racer Profiles 🏁`}
-                onPress={handleSubmit}
-                loading={loading}
-              />
-            )}
+        {/* Step Action Buttons (Natural Scrollable Form End) */}
+        <View style={styles.formFooterCard}>
+          <View style={styles.footerBtnGroup}>
+            <View style={styles.footerBackWrapper}>
+              <SecondaryButton title={currentStep === 1 ? 'Cancel' : 'Back'} onPress={handleBack} disabled={loading} />
+            </View>
+            <View style={styles.footerNextWrapper}>
+              {currentStep < TOTAL_STEPS ? (
+                <PrimaryButton title="Next Step →" onPress={handleNext} disabled={loading} />
+              ) : (
+                <PrimaryButton
+                  title={loading ? 'Submitting...' : 'Submit Racer Profiles 🏁'}
+                  onPress={handleSubmit}
+                  loading={loading}
+                />
+              )}
+            </View>
           </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAwareFormContainer>
+    </View>
   );
 };
 
@@ -1376,9 +1370,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 4,
   },
-  stickyFooterCard: {
-    backgroundColor: COLORS.surface,
-    padding: 14,
+  formFooterCard: {
+    marginTop: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: COLORS.surfaceBorder,
   },

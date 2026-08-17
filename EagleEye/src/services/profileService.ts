@@ -67,7 +67,7 @@ export const profileService = {
       if (stored) {
         return { status: 'success', user: JSON.parse(stored) };
       }
-    } catch (e) {}
+    } catch {}
 
     return { status: 'success', user: DEFAULT_USER };
   },
@@ -93,7 +93,7 @@ export const profileService = {
     };
     try {
       await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-    } catch (e) {}
+    } catch {}
 
     return {
       status: 'success',

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { Header, InputField, PrimaryButton } from '@/components';
+import { Header, InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { profileService, UserProfile } from '@/services/profileService';
 
 const STATS = [
@@ -186,7 +186,7 @@ export const DriverProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
+            <KeyboardAwareFormContainer style={styles.modalScroll}>
               <InputField label="Name" placeholder="Full name" value={editName} onChangeText={setEditName} icon="👤" />
               <InputField label="Contact" placeholder="Phone number" value={editContact} onChangeText={setEditContact} icon="📱" keyboardType="phone-pad" />
               <InputField label="Address" placeholder="Street address" value={editAddress} onChangeText={setEditAddress} icon="📍" />
@@ -195,7 +195,7 @@ export const DriverProfileScreen: React.FC = () => {
               <InputField label="Pincode" placeholder="Pincode" value={editPincode} onChangeText={setEditPincode} icon="📮" keyboardType="number-pad" />
 
               <PrimaryButton title={loading ? "Saving..." : "Save Profile"} icon="💾" onPress={handleUpdateProfile} disabled={loading} style={styles.saveBtn} />
-            </ScrollView>
+            </KeyboardAwareFormContainer>
           </View>
         </View>
       </Modal>

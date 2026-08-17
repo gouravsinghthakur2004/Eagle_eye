@@ -9,8 +9,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  Modal,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   NativeSyntheticEvent,
@@ -201,7 +199,7 @@ export const HomeScreen: React.FC = () => {
     openEventDetails(event.id, event);
   };
 
-  const handleResults = (event: EventItem) => {
+  const handleResults = (_event: EventItem) => {
     navigate('Results');
   };
 

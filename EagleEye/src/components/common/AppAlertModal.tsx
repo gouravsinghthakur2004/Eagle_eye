@@ -51,7 +51,7 @@ export const AppAlertModal: React.FC<AppAlertModalProps> = ({ modalData, onDismi
       scale.setValue(0.9);
       opacity.setValue(0);
     }
-  }, [modalData]);
+  }, [modalData, opacity, scale]);
 
   if (!modalData) return null;
 

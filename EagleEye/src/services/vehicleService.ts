@@ -223,11 +223,16 @@ export const vehicleService = {
     const sanitizedPayload = sanitizeVehiclePayload(payload, isUpdate);
 
     let apiResponseData: any = null;
-    let apiSuccess = false;
     let apiMessage = '';
 
+    const endpoints = [
+      ENDPOINTS.VEHICLE.SAVE,
+      '/vehicles/save',
+      '/vehicle/save',
+    ];
+
     // 2. Execute POST request to official endpoint /vehicle/save
-    for (const endpoint of PRIMARY_AND_FALLBACK_ENDPOINTS) {
+    for (const endpoint of endpoints) {
       try {
         const res = await client.post(endpoint, {
           ...sanitizedPayload,
@@ -238,7 +243,6 @@ export const vehicleService = {
           const isControllerErr =
             typeof body === 'string' && body.includes('not a valid controller name');
           if (!isControllerErr) {
-            apiSuccess = true;
             apiMessage = body?.message || (isUpdate ? 'Vehicle updated successfully' : 'Vehicle added successfully');
             apiResponseData = body?.vehicle || body?.data || body;
             break;
@@ -328,7 +332,7 @@ export const vehicleService = {
             break;
           }
         }
-      } catch (err: any) {
+      } catch {
         // Fallback to individual vehicle save
       }
     }
@@ -386,7 +390,7 @@ export const vehicleService = {
     if (!userId) return;
     try {
       await AsyncStorage.removeItem(getUserVehicleStorageKey(userId));
-    } catch (e) {}
+    } catch {}
   },
 
   /**
@@ -415,7 +419,7 @@ export const vehicleService = {
       return allVehicles.filter((v) =>
         v.vehicle_rc_no?.toLowerCase().includes(query.toLowerCase())
       );
-    } catch (e) {
+    } catch {
       return [];
     }
   },

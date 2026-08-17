@@ -25,6 +25,8 @@ interface InputFieldProps {
   multiline?: boolean;
   numberOfLines?: number;
   error?: string;
+  onFocus?: (e: any) => void;
+  onBlur?: (e: any) => void;
 }
 
 export const InputField: React.FC<InputFieldProps> = ({
@@ -42,6 +44,8 @@ export const InputField: React.FC<InputFieldProps> = ({
   multiline = false,
   numberOfLines,
   error,
+  onFocus,
+  onBlur,
 }) => {
   const [isSecure, setIsSecure] = useState(isPassword);
   const [isFocused, setIsFocused] = useState(false);
@@ -75,8 +79,14 @@ export const InputField: React.FC<InputFieldProps> = ({
           maxLength={maxLength}
           multiline={multiline}
           numberOfLines={numberOfLines}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            onBlur?.(e);
+          }}
         />
         {isPassword && (
           <TouchableOpacity

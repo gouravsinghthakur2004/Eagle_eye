@@ -28,7 +28,7 @@ export const fileCompression = {
       let ImageResizer: any;
       try {
         ImageResizer = require('react-native-image-resizer').default;
-      } catch (err) {
+      } catch {
         // ImageResizer module not linked; return original file safely
         return { file, compressed: false };
       }

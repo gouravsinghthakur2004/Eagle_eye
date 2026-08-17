@@ -1,142 +1,114 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  TextInput,
   TouchableOpacity,
-  ScrollView,
+  TextInput,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { PrimaryButton } from '@/components';
+import { PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 
 export const OtpScreen: React.FC = () => {
-  const { navigate, goBack, resetEmail, setResetEmail, setResetOtp } = useAppNavigation();
-  const [email, setEmail] = useState(resetEmail || '');
+  const { navigate, goBack, resetEmail, setResetOtp } = useAppNavigation();
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState<number>(59);
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(30);
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
-  // Auto-focus the first OTP box on screen mount
   useEffect(() => {
-    const focusTimer = setTimeout(() => {
-      inputRefs.current[0]?.focus();
-    }, 150);
-    return () => clearTimeout(focusTimer);
-  }, []);
-
-  useEffect(() => {
-    if (resetEmail && !email) {
-      setEmail(resetEmail);
+    let interval: ReturnType<typeof setInterval>;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
     }
-  }, [resetEmail]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [resendTimer]);
 
-  const handleOtpChange = (text: string, index: number) => {
+  const handleChangeText = (text: string, index: number) => {
     const cleanText = text.replace(/[^0-9]/g, '');
+    const newOtp = [...otp];
 
-    // Handle pasting full 6-digit OTP (e.g., "123456")
     if (cleanText.length > 1) {
-      const newOtp = [...otp];
+      const pastedDigits = cleanText.slice(0, 6).split('');
       for (let i = 0; i < 6; i++) {
-        newOtp[i] = cleanText[i] || '';
+        newOtp[i] = pastedDigits[i] || '';
       }
       setOtp(newOtp);
-      const targetIndex = Math.min(cleanText.length - 1, 5);
-      inputRefs.current[targetIndex]?.focus();
+      const nextFocusIndex = Math.min(pastedDigits.length, 5);
+      inputRefs.current[nextFocusIndex]?.focus();
       return;
     }
 
-    // Single digit entry or clearing digit
-    const digit = cleanText.slice(-1);
-    const newOtp = [...otp];
-    newOtp[index] = digit;
+    newOtp[index] = cleanText;
     setOtp(newOtp);
 
-    // Auto-advance focus forward
-    if (digit && index < 5) {
+    if (cleanText && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace') {
-      if (!otp[index] && index > 0) {
-        const newOtp = [...otp];
-        newOtp[index - 1] = '';
-        setOtp(newOtp);
-        inputRefs.current[index - 1]?.focus();
-      }
+    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const isOtpComplete = otp.join('').length === 6;
+  const isOtpComplete = otp.every((digit) => digit !== '');
+  const otpCode = otp.join('');
 
   const handleVerify = async () => {
-    const trimmedEmail = (email || resetEmail).trim();
-    if (!trimmedEmail) {
-      Alert.alert('Validation Error', 'Please enter your registered email address.');
+    const targetEmail = resetEmail || email.trim();
+    if (!targetEmail) {
+      Alert.alert('Error', 'Registered email address missing. Please request OTP again.');
+      navigate('ForgotPassword');
       return;
     }
 
-    const otpCode = otp.join('');
-    if (!otpCode || otpCode.length < 6) {
-      Alert.alert('Invalid OTP', 'Please enter complete 6-digit OTP code.');
+    if (!isOtpComplete) {
+      Alert.alert('Validation Error', 'Please enter full 6-digit OTP code.');
       return;
     }
 
     try {
       setLoading(true);
-      let res;
-      try {
-        res = await AuthService.verifyOtp(trimmedEmail, otpCode);
-      } catch (err) {
-        res = await AuthService.verifyRegisterOtp(trimmedEmail, otpCode);
-      }
+      const res = await AuthService.verifyOtp(targetEmail, otpCode);
 
-      // Persist verified state into navigation context
-      setResetEmail(trimmedEmail);
       setResetOtp(otpCode);
 
-      Alert.alert('Success', res.message || 'OTP verified successfully!', [
+      Alert.alert('OTP Verified', res.message || 'OTP code verified successfully. Please set your new password.', [
         {
-          text: 'Proceed to Reset Password',
+          text: 'Set New Password',
           onPress: () => {
-            setOtp(['', '', '', '', '', '']);
             navigate('SetPassword');
           },
         },
       ]);
     } catch (error: any) {
-      console.log('OTP Verification Error:', error?.response?.data || error.message);
-      const msg = error?.response?.data?.message || error?.message || 'Invalid or expired OTP. Please check and try again.';
-      Alert.alert('Verification Failed', msg);
+      console.log('Verify OTP Error:', error?.response?.data || error.message);
+      const errorMsg = error?.response?.data?.message || error?.message || 'Invalid or expired OTP code.';
+      Alert.alert('Verification Failed', errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResend = async () => {
-    const trimmedEmail = (email || resetEmail).trim();
-    if (!trimmedEmail) {
-      Alert.alert('Validation Error', 'Please enter your email address to resend OTP.');
+  const handleResendOtp = async () => {
+    const targetEmail = resetEmail || email.trim();
+    if (!targetEmail) {
+      Alert.alert('Error', 'No registered email specified to resend OTP.');
       return;
     }
 
     try {
-      setTimer(59);
-      const res = await AuthService.requestOtp(trimmedEmail);
+      setResendTimer(30);
+      const res = await AuthService.requestOtp(targetEmail);
       const otpNotice = res.otp ? `\n\nYour Verification OTP Code: ${res.otp}` : '';
       Alert.alert('OTP Sent', `${res.message || 'OTP sent successfully.'}${otpNotice}`);
     } catch (error: any) {
@@ -146,7 +118,7 @@ export const OtpScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
@@ -181,7 +153,7 @@ export const OtpScreen: React.FC = () => {
                 keyboardType="number-pad"
                 maxLength={6}
                 value={digit}
-                onChangeText={(text) => handleOtpChange(text, index)}
+                onChangeText={(text) => handleChangeText(text, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 selectTextOnFocus
               />
@@ -191,12 +163,12 @@ export const OtpScreen: React.FC = () => {
           <View style={styles.timerRow}>
             <Text style={styles.timerIcon}>⏱️</Text>
             <Text style={styles.timerText}>
-              {timer > 0 ? `Resend code in 0:${timer < 10 ? `0${timer}` : timer}` : "Didn't receive code?"}
+              {resendTimer > 0 ? `Resend code in 0:${resendTimer < 10 ? `0${resendTimer}` : resendTimer}` : "Didn't receive code?"}
             </Text>
           </View>
 
-          {timer === 0 ? (
-            <TouchableOpacity style={styles.resendBtn} onPress={handleResend}>
+          {resendTimer === 0 ? (
+            <TouchableOpacity style={styles.resendBtn} onPress={handleResendOtp}>
               <Text style={styles.resendText}>Resend OTP</Text>
             </TouchableOpacity>
           ) : null}
@@ -209,7 +181,7 @@ export const OtpScreen: React.FC = () => {
             style={styles.verifyBtn}
           />
         </View>
-      </ScrollView>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

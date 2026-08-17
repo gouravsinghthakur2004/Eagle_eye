@@ -21,7 +21,7 @@ export const bookingService = {
       return myEvents.some(
         (item) => String(item.event_id) === String(eventId) || String(item.participant_id) === String(eventId)
       );
-    } catch (e) {
+    } catch {
       return false;
     }
   },
@@ -49,7 +49,7 @@ export const bookingService = {
           return parsed;
         }
       }
-    } catch (storageErr) {}
+    } catch {}
 
     return [];
   },
@@ -69,8 +69,8 @@ export const bookingService = {
           }));
         }
       }
-    } catch (err) {
-      console.warn('[bookingService] getUserBookings error:', err);
+    } catch {
+      console.warn('[bookingService] getUserBookings error:');
     }
     return [];
   },
@@ -94,7 +94,6 @@ export const bookingService = {
       terms_accepted: payload.terms_accepted === 1 ? 1 : 0,
     };
 
-    let apiSuccess = false;
     let apiData: any = null;
     let apiMessage = '';
 
@@ -120,13 +119,12 @@ export const bookingService = {
           const body = res.data;
           const isErr = typeof body === 'string' && body.includes('not a valid controller');
           if (!isErr && (body.status === 'success' || body.status === 1 || body.participant_id || body.success)) {
-            apiSuccess = true;
             apiData = body.data || body;
             apiMessage = body.message || 'Event joined successfully!';
             break;
           }
         }
-      } catch (formDataErr) {}
+      } catch {}
 
       // 2. Try JSON Post
       try {
@@ -135,7 +133,6 @@ export const bookingService = {
           const body = res.data;
           const isErr = typeof body === 'string' && body.includes('not a valid controller');
           if (!isErr) {
-            apiSuccess = true;
             apiData = body.data || body;
             apiMessage = body.message || 'Event joined successfully!';
             break;

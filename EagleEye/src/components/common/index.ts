@@ -10,3 +10,5 @@ export * from '../drivers/DriverFormModal';
 export * from '../drivers/NavigatorFormModal';
 export * from './SearchSelectField';
 export * from './FormErrorBanner';
+export * from './KeyboardAwareFormContainer';
+

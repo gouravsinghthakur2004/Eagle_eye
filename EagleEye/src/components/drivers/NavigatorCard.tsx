@@ -9,7 +9,7 @@ interface NavigatorCardProps {
   onRemove?: (id: string | number) => void;
 }
 
-export const NavigatorCard: React.FC<NavigatorCardProps> = ({ navigator, onEdit }) => {
+export const NavigatorCard: React.FC<NavigatorCardProps> = ({ navigator, onEdit, onRemove }) => {
   return (
     <View style={styles.tableRow}>
       {/* Navigator Name Column */}
@@ -36,6 +36,11 @@ export const NavigatorCard: React.FC<NavigatorCardProps> = ({ navigator, onEdit 
         <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(navigator)}>
           <Text style={styles.editBtnText}>Edit</Text>
         </TouchableOpacity>
+        {onRemove && navigator.id !== undefined && (
+          <TouchableOpacity style={styles.removeBtn} onPress={() => onRemove(navigator.id!)}>
+            <Text style={styles.removeBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -91,6 +96,20 @@ const styles = StyleSheet.create({
   },
   editBtnText: {
     color: COLORS.accentOrange,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  removeBtn: {
+    backgroundColor: 'rgba(255, 68, 68, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    marginLeft: 6,
+  },
+  removeBtnText: {
+    color: COLORS.error,
     fontSize: 11,
     fontWeight: '800',
   },

@@ -5,12 +5,11 @@ import {
   View,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { PrimaryButton, SecondaryButton } from '@/components';
+import { PrimaryButton, SecondaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 
@@ -20,7 +19,6 @@ export const PostSignupOtpScreen: React.FC = () => {
     goBack,
     signupEmail,
     signupPassword,
-    clearSignupContext,
     onLoginSuccess,
   } = useAppNavigation();
 
@@ -85,11 +83,17 @@ export const PostSignupOtpScreen: React.FC = () => {
   const isOtpComplete = otp.join('').length === 6;
 
   const handleVerifyAndContinue = async () => {
-    if (!signupEmail) {
+    const trimmedEmail = signupEmail?.trim();
+    if (!trimmedEmail) {
       Alert.alert(
-        'Email Missing',
-        'Registration email not found. Please log in with your password or sign up again.',
-        [{ text: 'Login with Password', onPress: () => navigate('Login') }]
+        'Session Expired',
+        'Registered email address is missing. Please sign up again.',
+        [
+          {
+            text: 'Go to Signup',
+            onPress: () => navigate('Signup'),
+          },
+        ]
       );
       return;
     }
@@ -102,70 +106,46 @@ export const PostSignupOtpScreen: React.FC = () => {
 
     try {
       setLoading(true);
+      const res = await AuthService.verifyRegisterOtp(trimmedEmail, otpCode);
 
-      // 1. Verify OTP with real backend API
-      let verifyRes;
-      try {
-        verifyRes = await AuthService.verifyRegisterOtp(signupEmail, otpCode);
-      } catch (err) {
-        verifyRes = await AuthService.verifyOtp(signupEmail, otpCode);
-      }
-
-      // 2. Perform Auto-Login if signup password is available in context
-      if (signupPassword) {
-        try {
-          const loginResult = await AuthService.login(signupEmail, signupPassword);
-          clearSignupContext();
-
-          Alert.alert(
-            'Verification Successful',
-            verifyRes.message || 'Account verified and logged in successfully!',
-            [
-              {
-                text: 'Continue to Home',
-                onPress: () => {
-                  onLoginSuccess(loginResult.data as any);
-                },
-              },
-            ]
-          );
-          return;
-        } catch (loginErr) {
-          console.warn('Auto-login failed after verification:', loginErr);
-        }
-      }
-
-      // Fallback if auto-login password not in memory
-      clearSignupContext();
-      Alert.alert(
-        'Account Activated',
-        verifyRes.message || 'Account activated successfully! Please log in with your password.',
-        [{ text: 'Log In', onPress: () => navigate('Login') }]
-      );
+      Alert.alert('Success 🏁', res.message || 'OTP verified successfully! Auto-logging you in...', [
+        {
+          text: 'Continue',
+          onPress: async () => {
+            if (signupPassword) {
+              try {
+                const loginRes = await AuthService.login(trimmedEmail, signupPassword);
+                onLoginSuccess(loginRes.data as any);
+              } catch {
+                navigate('Login');
+              }
+            } else {
+              navigate('Login');
+            }
+          },
+        },
+      ]);
     } catch (error: any) {
-      console.log('Post-Signup OTP Error:', error?.response?.data || error.message);
-      const errorMsg =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        'Invalid or expired OTP. Please check and try again.';
-
-      Alert.alert('Verification Failed', errorMsg);
+      console.log('Post-Signup OTP Verification Error:', error?.response?.data || error.message);
+      const msg = error?.response?.data?.message || error?.message || 'Invalid or expired OTP. Please check and try again.';
+      Alert.alert('Verification Failed', msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (!signupEmail) {
-      Alert.alert('Error', 'Registered email address is missing.');
+    const trimmedEmail = signupEmail?.trim();
+    if (!trimmedEmail) {
+      Alert.alert('Error', 'No registered email specified to resend OTP.');
       return;
     }
 
     try {
       setTimer(59);
-      const res = await AuthService.requestOtp(signupEmail);
-      Alert.alert('OTP Resent', res.message || 'OTP sent successfully to your registered email.');
+      const res = await AuthService.requestOtp(trimmedEmail);
+      const otpNotice = res.otp ? `\n\nYour Verification OTP Code: ${res.otp}` : '';
+      Alert.alert('OTP Sent', `${res.message || 'OTP sent successfully.'}${otpNotice}`);
     } catch (error: any) {
       Alert.alert('Resend Failed', error?.response?.data?.message || 'Could not send OTP');
     }
@@ -173,7 +153,7 @@ export const PostSignupOtpScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
         {/* Back Button */}
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>←</Text>
@@ -249,7 +229,7 @@ export const PostSignupOtpScreen: React.FC = () => {
             onPress={() => navigate('Login')}
           />
         </View>
-      </ScrollView>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

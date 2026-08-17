@@ -44,6 +44,7 @@ export interface RegisterResponse {
   pincode?: string;
 }
 
+/* eslint-disable no-bitwise */
 const generateUserIdFromUsername = (str: string): string => {
   if (!str) return String(Date.now());
   let hash = 0;
@@ -53,6 +54,7 @@ const generateUserIdFromUsername = (str: string): string => {
   }
   return String(Math.abs(hash) || 100);
 };
+/* eslint-enable no-bitwise */
 
 export const AuthService = {
   // 1. Login API with Resilient Network Error Fallback

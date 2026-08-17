@@ -4,11 +4,7 @@ import {
   Text,
   View,
   TouchableOpacity,
-  ScrollView,
-  Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,17 +13,12 @@ import { Header } from '@/components/layout/Header';
 import { InputField } from '@/components/forms/InputField';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { DatePickerInput } from '@/components/common/DatePickerInput';
+import { KeyboardAwareFormContainer, KeyboardAwareFormContainerRef } from '@/components/common/KeyboardAwareFormContainer';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { eventService } from '@/services/eventService';
 import { bookingService } from '@/services/bookingService';
-import { SearchSelectField, SearchResultItem } from '@/components/common/SearchSelectField';
-import { driverService } from '@/services/driverService';
-import { navigatorService } from '@/services/navigatorService';
-import { vehicleService } from '@/services/vehicleService';
 import { EventCategory, EventClass, JoinEventPayload } from '@/types';
 import { useNotification } from '@/hooks/useNotification';
-import { isEventJoinable } from '@/utils/eventLifecycle';
-import { validatePaymentReference, validateAmount } from '@/utils/formValidation';
 
 import { FormErrorBanner } from '@/components/common/FormErrorBanner';
 
@@ -44,28 +35,24 @@ export const JoinEventScreen: React.FC = () => {
     goBack,
     navigate,
     finishJoinEventAndNavigateToMyEvents,
-    user,
     selectedJoinEvent,
     selectedDriverForJoin,
     selectedNavigatorForJoin,
     selectedVehicleForJoin,
-    selectDriverForJoin,
-    selectNavigatorForJoin,
-    selectVehicleForJoin,
     termsAcceptedInJoin,
     setTermsAcceptedInJoin,
     joinFormDraft,
     updateJoinFormDraft,
   } = useAppNavigation();
 
-  const { showSuccess, showError, showWarning } = useNotification();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const { showSuccess, showError } = useNotification();
+  const formContainerRef = useRef<KeyboardAwareFormContainerRef>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
   useEffect(() => {
     Keyboard.dismiss();
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      formContainerRef.current?.scrollTo({ y: 0, animated: true });
     }, 60);
     return () => clearTimeout(timer);
   }, [selectedJoinEvent]);
@@ -228,7 +215,7 @@ export const JoinEventScreen: React.FC = () => {
 
     if (errors.length > 0) {
       setFormErrors(errors);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      formContainerRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
@@ -274,11 +261,12 @@ export const JoinEventScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Header title="Join Event" showBack onBack={goBack} />
 
-      <KeyboardAvoidingView
-        style={styles.flexOne}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView ref={scrollViewRef} style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.flexOne}>
+        <KeyboardAwareFormContainer
+          ref={formContainerRef}
+          contentContainerStyle={styles.scrollContent}
+          extraScrollHeight={140}
+        >
           {/* Event Header Banner */}
           <View style={styles.eventCardHeader}>
             <Text style={styles.eventBadge}>EVENT REGISTRATION</Text>
@@ -579,18 +567,18 @@ export const JoinEventScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
 
-        {/* Bottom Submit Action */}
-        <View style={styles.footerBar}>
-          <PrimaryButton
-            title={submitting ? 'Submitting Registration...' : 'Join Event 🏁'}
-            onPress={handleSubmit}
-            loading={submitting}
-            disabled={submitting}
-          />
-        </View>
-      </KeyboardAvoidingView>
+          {/* Bottom Submit Action (Natural Scrollable Form End) */}
+          <View style={styles.footerBar}>
+            <PrimaryButton
+              title={submitting ? 'Submitting Registration...' : 'Join Event 🏁'}
+              onPress={handleSubmit}
+              loading={submitting}
+              disabled={submitting}
+            />
+          </View>
+        </KeyboardAwareFormContainer>
+      </View>
     </SafeAreaView>
   );
 };
@@ -604,8 +592,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flex: 1,
     padding: 16,
+    paddingBottom: 24,
   },
   eventCardHeader: {
     backgroundColor: COLORS.surface,
@@ -825,10 +813,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footerBar: {
-    padding: 16,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
+    marginTop: 16,
+    marginBottom: 32,
+    paddingTop: 8,
   },
   disabledBtn: {
     opacity: 0.55,

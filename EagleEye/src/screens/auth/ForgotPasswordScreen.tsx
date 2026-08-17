@@ -3,13 +3,12 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { InputField, PrimaryButton } from '@/components';
+import { InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 
@@ -68,7 +67,7 @@ export const ForgotPasswordScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer contentContainerStyle={styles.scrollContent}>
         {/* Back Button */}
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>←</Text>
@@ -110,7 +109,7 @@ export const ForgotPasswordScreen: React.FC = () => {
             <Text style={styles.loginLink}>Log In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAwareFormContainer>
     </SafeAreaView>
   );
 };

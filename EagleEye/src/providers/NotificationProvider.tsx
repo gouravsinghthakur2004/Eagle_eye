@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useState, useCallback } from 'react';
 import { AppToast, ToastData, ToastType } from '@/components/common/AppToast';
 import { AppAlertModal, ConfirmModalData } from '@/components/common/AppAlertModal';
 
@@ -26,7 +26,7 @@ export interface NotificationContextType {
 export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [toastQueue, setToastQueue] = useState<ToastData[]>([]);
+  const [_toastQueue, setToastQueue] = useState<ToastData[]>([]);
   const [activeToast, setActiveToast] = useState<ToastData | null>(null);
   const [confirmModalData, setConfirmModalData] = useState<ConfirmModalData | null>(null);
 

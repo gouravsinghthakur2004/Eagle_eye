@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -34,6 +34,23 @@ export const AppToast: React.FC<AppToastProps> = ({ toast, onDismiss }) => {
   const translateY = useRef(new Animated.Value(-150)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
+  const handleDismiss = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -150,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onDismiss();
+    });
+  }, [opacity, translateY, onDismiss]);
+
   useEffect(() => {
     if (toast) {
       // Animate in: slide down + fade in
@@ -62,24 +79,7 @@ export const AppToast: React.FC<AppToastProps> = ({ toast, onDismiss }) => {
       translateY.setValue(-150);
       opacity.setValue(0);
     }
-  }, [toast]);
-
-  const handleDismiss = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -150,
-        duration: 280,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onDismiss();
-    });
-  };
+  }, [toast, handleDismiss, opacity, translateY]);
 
   if (!toast) return null;
 

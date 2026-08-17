@@ -21,7 +21,7 @@ export const ResultsScreen: React.FC = () => {
       return;
     }
     resultService.getResults().then(setResults);
-  }, [selectedEventData]);
+  }, [selectedEventData, goBack, showWarning]);
 
   return (
     <SafeAreaView style={styles.container}>

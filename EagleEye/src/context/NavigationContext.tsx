@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setUnauthorizedListener } from '@/api/client';
 import { profileService, UserProfile } from '@/services/profileService';
 import { AuthService } from '@/services/authService';
@@ -307,7 +306,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const logout = async () => {
     try {
       await AuthService.logout();
-    } catch (e) {}
+    } catch {}
     setIsAuthenticated(false);
     setUser(null);
     setIsDrawerOpen(false);

@@ -4,11 +4,8 @@ import {
   Text,
   View,
   ScrollView,
-  TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Modal,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
@@ -49,7 +46,7 @@ export const EventsScreen: React.FC = () => {
     openEventDetails(event.id, event);
   };
 
-  const handleResults = (event: EventItem) => {
+  const handleResults = (_event: EventItem) => {
     navigate('Results');
   };
 

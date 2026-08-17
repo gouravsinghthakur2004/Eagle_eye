@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -128,14 +128,14 @@ export const EventDetailsScreen: React.FC = () => {
   }, [selectedEventId]);
 
   // Image URI resolution
-  const getInitialImageUri = () => {
+  const getInitialImageUri = useCallback(() => {
     if (!event || !event.event_pic || event.event_pic.trim() === '') return DEFAULT_HERO_IMAGE;
     if (event.event_pic.startsWith('http://') || event.event_pic.startsWith('https://')) {
       return event.event_pic;
     }
     const cleanPath = event.event_pic.replace(/^\//, '');
     return `https://eagleeyeofficial.com/demo/${cleanPath}`;
-  };
+  }, [event]);
 
   const [imageUri, setImageUri] = useState<string>(getInitialImageUri());
 
@@ -144,7 +144,7 @@ export const EventDetailsScreen: React.FC = () => {
       setImageUri(getInitialImageUri());
       setImageError(false);
     }
-  }, [event]);
+  }, [event, getInitialImageUri]);
 
   const handleImageError = () => {
     if (!imageError) {

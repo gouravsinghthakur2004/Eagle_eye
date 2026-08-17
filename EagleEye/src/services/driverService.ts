@@ -30,7 +30,7 @@ export const driverService = {
       return allDrivers.filter((d: DriverNavigatorProfile) =>
         d.full_name?.toLowerCase().includes(query.toLowerCase())
       );
-    } catch (e) {
+    } catch {
       return [];
     }
   },

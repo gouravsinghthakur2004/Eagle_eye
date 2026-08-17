@@ -165,11 +165,17 @@ export const driverNavigatorService = {
     const sanitizedPayload = sanitizeDriverNavigatorPayload(payload);
 
     let apiResponseData: any = null;
-    let apiSuccess = false;
     let apiMessage = '';
 
+    const endpoints = [
+      ENDPOINTS.DRIVER_NAVIGATOR.SAVE,
+      '/driver-navigator/save',
+      '/drivernavigator/save',
+      '/driver_navigator/save',
+    ];
+
     // 2. Execute POST request to official endpoint /driver/save
-    for (const endpoint of PRIMARY_AND_FALLBACK_ENDPOINTS) {
+    for (const endpoint of endpoints) {
       try {
         const res = await client.post(endpoint, {
           ...sanitizedPayload,
@@ -180,7 +186,6 @@ export const driverNavigatorService = {
           const isControllerErr =
             typeof body === 'string' && body.includes('not a valid controller name');
           if (!isControllerErr) {
-            apiSuccess = true;
             apiMessage = body?.message || 'Driver/Navigator updated successfully';
             apiResponseData = body?.profile || body?.data || body;
             break;
@@ -289,7 +294,7 @@ export const driverNavigatorService = {
             break;
           }
         }
-      } catch (err: any) {
+      } catch {
         // Fallback to individual items save if array payload endpoint returns 404 or controller error
       }
     }
@@ -349,7 +354,7 @@ export const driverNavigatorService = {
     if (!userId) return;
     try {
       await AsyncStorage.removeItem(getUserStorageKey(userId));
-    } catch (e) {}
+    } catch {}
   },
 };
 

@@ -5,7 +5,7 @@
 
 import { SelectedFile } from './fileValidation';
 import { fileCompression } from './fileCompression';
-import { driverNavigatorService, sanitizeDriverNavigatorPayload } from '@/services/driverNavigatorService';
+import { driverNavigatorService } from '@/services/driverNavigatorService';
 import { DriverNavigatorProfile } from '@/types';
 
 export interface UploadQueueItem {

@@ -3,8 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
-  ScrollView,
 } from 'react-native';
 import { COLORS } from '@/theme/colors';
 import { InputField } from '../forms/InputField';

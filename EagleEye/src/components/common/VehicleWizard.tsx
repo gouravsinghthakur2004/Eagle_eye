@@ -5,20 +5,20 @@ import {
   View,
   TouchableOpacity,
   TextInput,
-  ScrollView,
   Image,
   Alert,
   Modal,
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
+import { KeyboardAwareFormContainer, KeyboardAwareFormContainerRef } from './KeyboardAwareFormContainer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { COLORS } from '@/theme/colors';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { VehicleProfile } from '@/types';
 import { SelectedFile, fileValidation } from '@/utils/fileValidation';
-import { vehicleUploadQueue, VehicleUploadFieldKey, VehicleUploadProgressStatus } from '@/utils/vehicleUploadQueue';
+import type { VehicleUploadFieldKey, VehicleUploadProgressStatus } from '@/utils/vehicleUploadQueue';
 import { vehicleService } from '@/services/vehicleService';
 import { fileCompression } from '@/utils/fileCompression';
 import { validateRcNumber, validateName } from '@/utils/formValidation';
@@ -82,13 +82,13 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [draftRestored, setDraftRestored] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const formContainerRef = useRef<KeyboardAwareFormContainerRef>(null);
 
   useEffect(() => {
     Keyboard.dismiss();
     setFormErrors([]);
     const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      formContainerRef.current?.scrollTo({ y: 0, animated: true });
     }, 60);
     return () => clearTimeout(timer);
   }, [currentStep]);
@@ -282,7 +282,7 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
       let DocumentPickerModule: any;
       try {
         DocumentPickerModule = require('react-native-document-picker').default;
-      } catch (e) {}
+      } catch {}
 
       if (DocumentPickerModule && typeof DocumentPickerModule.pickSingle === 'function') {
         const res = await DocumentPickerModule.pickSingle({
@@ -356,7 +356,7 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
 
     if (errors.length > 0) {
       setFormErrors(errors);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      formContainerRef.current?.scrollTo({ y: 0, animated: true });
       return false;
     }
 
@@ -545,7 +545,7 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
 
 
       {/* Form Content */}
-      <ScrollView ref={scrollViewRef} style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareFormContainer ref={formContainerRef} contentContainerStyle={styles.scrollContent} extraScrollHeight={100}>
         {/* STEP 1: VEHICLE IDENTITY */}
         {currentStep === 1 && (
           <View style={styles.stepCard}>
@@ -866,40 +866,40 @@ export const VehicleWizard: React.FC<VehicleWizardProps> = ({
             ))}
           </View>
         )}
-      </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNavContainer}>
-        {currentStep > 1 ? (
-          <TouchableOpacity
-            style={styles.prevBtn}
-            onPress={handlePrevious}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.prevBtnText}>❮ Previous</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={isSubmitting}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        )}
+        {/* Bottom Navigation (Natural Scrollable Form End) */}
+        <View style={styles.bottomNavContainer}>
+          {currentStep > 1 ? (
+            <TouchableOpacity
+              style={styles.prevBtn}
+              onPress={handlePrevious}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.prevBtnText}>❮ Previous</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={isSubmitting}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
 
-        {currentStep < TOTAL_STEPS ? (
-          <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-            <Text style={styles.nextBtnText}>Next ❯</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.submitBtn}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.submitBtnText}>
-              {isSubmitting ? 'SUBMITTING…' : 'SUBMIT VEHICLES ➔'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {currentStep < TOTAL_STEPS ? (
+            <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+              <Text style={styles.nextBtnText}>Next ❯</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.submitBtn}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.submitBtnText}>
+                {isSubmitting ? 'SUBMITTING…' : 'SUBMIT VEHICLES ➔'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAwareFormContainer>
 
       {/* Modal Pickers */}
       <Modal visible={pickerModalVisible} transparent animationType="slide">
@@ -1234,8 +1234,9 @@ const styles = StyleSheet.create({
   },
   bottomNavContainer: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: COLORS.surface,
+    marginTop: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: COLORS.surfaceBorder,
     gap: 12,

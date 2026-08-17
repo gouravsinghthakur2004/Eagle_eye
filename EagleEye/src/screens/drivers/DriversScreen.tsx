@@ -12,7 +12,6 @@ import { COLORS } from '@/theme/colors';
 import { Header } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { driverNavigatorService } from '@/services/driverNavigatorService';
-import { DriverItem } from '@/types';
 
 export const DriversScreen: React.FC = () => {
   const { navigate } = useAppNavigation();
