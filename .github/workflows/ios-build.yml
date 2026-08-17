@@ -3,11 +3,13 @@ name: Build iOS App (Eagle Eye)
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build-ios:
-    name: Build iOS App Binary
+  build-ios-simulator:
+    name: iOS Simulator Release Build
     runs-on: macos-15
     steps:
       - name: Checkout repository
@@ -20,69 +22,191 @@ jobs:
           cache: 'npm'
           cache-dependency-path: EagleEye/package-lock.json
 
-      - name: Select Xcode 16+
+      - name: Select Xcode 16 Toolchain
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.app || true
+          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.0.app || true
           xcodebuild -version
 
-      - name: Install JS dependencies
+      - name: Configure Node Binary for Xcode Build Phases
+        run: |
+          echo "export NODE_BINARY=$(which node)" > EagleEye/ios/.xcode.env.local
+          cat EagleEye/ios/.xcode.env.local
+
+      - name: Install JavaScript Dependencies
         run: |
           cd EagleEye
           npm ci
 
-      - name: Install CocoaPods
+      - name: Install CocoaPods Dependencies
         run: |
           cd EagleEye/ios
           pod install
 
-      - name: Build iOS Simulator App Bundle (Mac)
+      - name: Build iOS Simulator Binary (Release)
         run: |
           cd EagleEye/ios
-          xcodebuild -workspace EagleEye.xcworkspace \
-                     -scheme EagleEye \
-                     -sdk iphonesimulator \
-                     -destination 'generic/platform=iOS Simulator' \
-                     -configuration Release \
-                     -derivedDataPath build \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_IDENTITY="" \
-                     COMPILER_INDEX_STORE_ENABLE=NO \
-                     build
+          xcodebuild build \
+            -workspace EagleEye.xcworkspace \
+            -scheme EagleEye \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-      - name: Package Simulator App (.zip)
+      - name: Package Simulator App Bundle
         run: |
           cd EagleEye/ios/build/Build/Products/Release-iphonesimulator
-          zip -r EagleEye-Mac-Simulator.zip EagleEye.app
+          zip -r EagleEye-Simulator.app.zip EagleEye.app
 
-      - name: Build iOS Archive (.ipa)
+      - name: Upload iOS Simulator App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EagleEye-iOS-Simulator-App
+          path: EagleEye/ios/build/Build/Products/Release-iphonesimulator/EagleEye-Simulator.app.zip
+          retention-days: 14
+
+  build-ios-device:
+    name: iOS Physical Device Archive & IPA
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: EagleEye/package-lock.json
+
+      - name: Select Xcode 16 Toolchain
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.0.app || true
+          xcodebuild -version
+
+      - name: Configure Node Binary for Xcode Build Phases
+        run: |
+          echo "export NODE_BINARY=$(which node)" > EagleEye/ios/.xcode.env.local
+          cat EagleEye/ios/.xcode.env.local
+
+      - name: Install JavaScript Dependencies
+        run: |
+          cd EagleEye
+          npm ci
+
+      - name: Install CocoaPods Dependencies
+        run: |
+          cd EagleEye/ios
+          pod install
+
+      - name: Check Signing Credentials Availability
+        id: check_signing
+        env:
+          HAS_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+          HAS_PROFILE: ${{ secrets.PROVISIONING_PROFILE_BASE64 != '' }}
+        run: |
+          if [ "$HAS_CERT" = "true" ] && [ "$HAS_PROFILE" = "true" ]; then
+            echo "signing_available=true" >> $GITHUB_OUTPUT
+            echo "Apple signing credentials detected in GitHub Secrets."
+          else
+            echo "signing_available=false" >> $GITHUB_OUTPUT
+            echo "No Apple signing credentials found. Building unsigned device archive."
+          fi
+
+      - name: Setup Apple Signing Keychain (If Credentials Configured)
+        if: steps.check_signing.outputs.signing_available == 'true'
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$APPLE_CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
+          security import $CERT_PATH -k $KEYCHAIN_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          PROFILE_PATH=~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
+
+      - name: Build Device Archive (Signed)
+        if: steps.check_signing.outputs.signing_available == 'true'
         run: |
           cd EagleEye/ios
           xcodebuild archive \
-                     -workspace EagleEye.xcworkspace \
-                     -scheme EagleEye \
-                     -configuration Release \
-                     -archivePath build/EagleEye.xcarchive \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_IDENTITY="" \
-                     COMPILER_INDEX_STORE_ENABLE=NO
+            -workspace EagleEye.xcworkspace \
+            -scheme EagleEye \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/EagleEye.xcarchive \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
 
-      - name: Package .ipa for iOS Device
+      - name: Export Signed IPA
+        if: steps.check_signing.outputs.signing_available == 'true'
         run: |
-          cd EagleEye/ios/build/EagleEye.xcarchive/Products/Applications
-          mkdir -p Payload
-          cp -r EagleEye.app Payload/
-          zip -r EagleEye-iOS.ipa Payload
+          cd EagleEye/ios
+          xcodebuild -exportArchive \
+            -archivePath build/EagleEye.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist
 
-      - name: Upload Mac / Simulator App (.zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: EagleEye-Mac-Simulator-App
-          path: EagleEye/ios/build/Build/Products/Release-iphonesimulator/EagleEye-Mac-Simulator.zip
-
-      - name: Upload iOS (.ipa) Package
+      - name: Upload Signed IPA Artifact
+        if: steps.check_signing.outputs.signing_available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: EagleEye-iOS-IPA
-          path: EagleEye/ios/build/EagleEye.xcarchive/Products/Applications/EagleEye-iOS.ipa
+          path: EagleEye/ios/build/export/*.ipa
+          retention-days: 14
+
+      - name: Build Unsigned Device Archive (When Signing Not Configured)
+        if: steps.check_signing.outputs.signing_available == 'false'
+        run: |
+          cd EagleEye/ios
+          xcodebuild archive \
+            -workspace EagleEye.xcworkspace \
+            -scheme EagleEye \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/EagleEye.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_INJECT_BASE_ENTITLEMENTS=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
+
+      - name: Package Unsigned Device Artifacts
+        if: steps.check_signing.outputs.signing_available == 'false'
+        run: |
+          cd EagleEye/ios/build
+          zip -r EagleEye-Device.xcarchive.zip EagleEye.xcarchive
+          if [ -d "EagleEye.xcarchive/Products/Applications" ]; then
+            cd EagleEye.xcarchive/Products/Applications
+            mkdir -p Payload
+            cp -r EagleEye.app Payload/
+            zip -r ../../../EagleEye-iOS-Unsigned.ipa Payload
+          fi
+
+      - name: Upload Unsigned Device Archive Artifact
+        if: steps.check_signing.outputs.signing_available == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: EagleEye-iOS-Device-Archive
+          path: |
+            EagleEye/ios/build/EagleEye-Device.xcarchive.zip
+            EagleEye/ios/build/EagleEye-iOS-Unsigned.ipa
+          retention-days: 14
