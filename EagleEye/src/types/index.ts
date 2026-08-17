@@ -25,6 +25,7 @@ export interface EventItem {
 }
 
 export interface MyEventItem {
+  id?: string | number;
   participant_id: string | number;
   event_id: string | number;
   asn?: string;

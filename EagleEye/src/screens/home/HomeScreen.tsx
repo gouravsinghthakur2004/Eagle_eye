@@ -21,6 +21,7 @@ import { Header, EventCard } from '@/components';
 import { useAppNavigation, ScreenName } from '@/context/NavigationContext';
 import { eventService } from '@/services/eventService';
 import { bannerService, ApiBannerItem, resolveBannerImage } from '@/services/bannerService';
+import { bookingService } from '@/services/bookingService';
 import { EventItem } from '@/types';
 
 const { width } = Dimensions.get('window');
@@ -29,10 +30,12 @@ const { width } = Dimensions.get('window');
 const CAROUSEL_WIDTH = width - 32;
 
 export const HomeScreen: React.FC = () => {
-  const { navigate, openEventDetails, openJoinEvent } = useAppNavigation();
+  const { navigate, openEventDetails, openJoinEvent, user } = useAppNavigation();
+  const userId = user?.id || (user as any)?.user_id;
   const [searchQuery, setSearchQuery] = useState('');
   const [apiBanners, setApiBanners] = useState<ApiBannerItem[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
+  const [joinedEventIds, setJoinedEventIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
@@ -46,10 +49,16 @@ export const HomeScreen: React.FC = () => {
   const loadHomeData = async () => {
     try {
       setLoading(true);
-      const [banners, realEvents] = await Promise.all([
+      const [banners, realEvents, myEventsList] = await Promise.all([
         bannerService.getBanners(),
         eventService.getEvents(),
+        bookingService.getMyEvents(userId),
       ]);
+
+      const joinedSet = new Set(
+        myEventsList.map((item) => String(item.event_id || item.participant_id || item.id))
+      );
+      setJoinedEventIds(joinedSet);
 
       // Enrich dynamic banners by cross-referencing event_id against real events
       const enrichedBanners: ApiBannerItem[] = banners.map((b) => {
@@ -372,6 +381,7 @@ export const HomeScreen: React.FC = () => {
                 <View style={{ width: CAROUSEL_WIDTH }}>
                   <EventCard
                     event={item}
+                    isJoined={joinedEventIds.has(String(item.id))}
                     cardWidth={CAROUSEL_WIDTH}
                     style={{ marginRight: 0 }}
                     onViewDetails={handleViewDetails}

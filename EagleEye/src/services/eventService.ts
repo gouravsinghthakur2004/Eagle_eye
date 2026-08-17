@@ -146,9 +146,9 @@ export const eventService = {
 
   getEventDetails: async (eventId: string): Promise<EventItem | null> => {
     try {
-      const response = await client.get<any>(ENDPOINTS.DRIVER_NAVIGATOR.DETAIL(eventId));
-      if (response.data && response.data.event) {
-        return response.data.event;
+      const response = await client.get<any>(ENDPOINTS.EVENTS.DETAIL(eventId));
+      if (response.data && (response.data.event || response.data.data)) {
+        return response.data.event || response.data.data;
       }
     } catch {}
 

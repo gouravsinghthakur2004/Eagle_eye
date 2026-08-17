@@ -17,6 +17,7 @@ export const ENDPOINTS = {
   },
   EVENTS: {
     LIST: '/events',
+    DETAIL: (eventId: string | number) => `/events/${eventId}`,
     CATEGORIES: (eventId: string | number) => `/events/${eventId}/categories`,
     CLASSES: (eventId: string | number, categoryId: string | number) => `/events/${eventId}/categories/${categoryId}/classes`,
     JOIN: '/events/join',

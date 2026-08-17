@@ -17,6 +17,7 @@ import { getEventStatusInfo } from '@/utils/eventLifecycle';
 
 interface EventCardProps {
   event: EventItem;
+  isJoined?: boolean;
   onViewDetails?: (event: EventItem) => void;
   onResults?: (event: EventItem) => void;
   onJoinEvent?: (event: EventItem) => void;
@@ -35,6 +36,7 @@ const formatDateOnly = (dateStr?: string | null): string => {
 
 export const EventCard: React.FC<EventCardProps> = ({
   event,
+  isJoined = false,
   onViewDetails,
   onResults,
   onJoinEvent,
@@ -259,13 +261,27 @@ export const EventCard: React.FC<EventCardProps> = ({
           )}
 
           {/* 11. Join Event Button */}
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.joinBtn]}
-            activeOpacity={0.8}
-            onPress={() => onJoinEvent && onJoinEvent(event)}
-          >
-            <Text style={styles.joinBtnText}>Join</Text>
-          </TouchableOpacity>
+          {isJoined ? (
+            <View style={[styles.actionBtn, styles.joinedBtn]}>
+              <Text style={styles.joinedBtnText}>✓ Joined</Text>
+            </View>
+          ) : statusInfo.status === 'live' ? (
+            <View style={[styles.actionBtn, styles.disabledStatusBtn]}>
+              <Text style={styles.disabledStatusText}>Closed</Text>
+            </View>
+          ) : statusInfo.status === 'completed' ? (
+            <View style={[styles.actionBtn, styles.disabledStatusBtn]}>
+              <Text style={styles.disabledStatusText}>Ended</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.joinBtn]}
+              activeOpacity={0.8}
+              onPress={() => onJoinEvent && onJoinEvent(event)}
+            >
+              <Text style={styles.joinBtnText}>Join</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 12. Contact Us Row */}
@@ -672,5 +688,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  joinedBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#10B981',
+  },
+  joinedBtnText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '900',
   },
 });

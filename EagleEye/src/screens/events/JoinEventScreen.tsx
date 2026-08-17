@@ -34,6 +34,7 @@ export const JoinEventScreen: React.FC = () => {
   const {
     goBack,
     navigate,
+    user,
     finishJoinEventAndNavigateToMyEvents,
     selectedJoinEvent,
     selectedDriverForJoin,
@@ -243,7 +244,8 @@ export const JoinEventScreen: React.FC = () => {
 
     try {
       setSubmitting(true);
-      const res = await bookingService.joinEvent(payload);
+      const userId = user?.id || (user as any)?.user_id;
+      const res = await bookingService.joinEvent(payload, userId, event);
       setSubmitting(false);
 
       if (res.success) {

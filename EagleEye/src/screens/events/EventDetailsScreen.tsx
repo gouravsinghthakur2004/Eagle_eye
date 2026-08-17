@@ -388,15 +388,27 @@ export const EventDetailsScreen: React.FC = () => {
           {/* 9. STICKY BOTTOM ACTION BAR */}
           {(() => {
             const statusInfo = getEventStatusInfo(event?.event_start_date, event?.event_end_date, event?.result_published);
+            const isJoinDisabled = !isJoined && (statusInfo.status === 'live' || statusInfo.status === 'completed');
+
             return (
               <View style={styles.stickyFooter}>
                 <TouchableOpacity
-                  style={[styles.joinNowBtn, isJoined && styles.joinedBtn]}
-                  activeOpacity={0.8}
+                  style={[
+                    styles.joinNowBtn,
+                    isJoined ? styles.joinedBtn : isJoinDisabled ? styles.disabledJoinBtn : null,
+                  ]}
+                  activeOpacity={isJoinDisabled ? 1 : 0.8}
+                  disabled={isJoinDisabled}
                   onPress={handleJoinNow}
                 >
-                  <Text style={styles.joinNowText}>
-                    {isJoined ? 'Already Registered 🏎️' : 'Join Event 🏁'}
+                  <Text style={[styles.joinNowText, isJoinDisabled && styles.disabledJoinText]}>
+                    {isJoined
+                      ? 'Already Registered ✓'
+                      : statusInfo.status === 'live'
+                      ? 'Event Live (Closed)'
+                      : statusInfo.status === 'completed'
+                      ? 'Event Ended'
+                      : 'Join Event 🏁'}
                   </Text>
                 </TouchableOpacity>
 

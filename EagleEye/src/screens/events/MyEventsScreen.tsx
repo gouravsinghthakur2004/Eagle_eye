@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  RefreshControl,
   ActivityIndicator,
   Linking,
 } from 'react-native';
@@ -29,35 +28,36 @@ const formatDateOnly = (dateStr?: string | null): string => {
 };
 
 export const MyEventsScreen: React.FC = () => {
-  const { goBack, navigate, openEventDetails } = useAppNavigation();
+  const { goBack, navigate, openEventDetails, user, currentScreen } = useAppNavigation();
+  const userId = user?.id || (user as any)?.user_id;
   const { showError } = useNotification();
 
   const [myEvents, setMyEvents] = useState<MyEventItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Completed'>('All');
 
   const fetchMyEvents = useCallback(async () => {
     try {
       setLoading(true);
-      const list = await bookingService.getMyEvents();
+      const list = await bookingService.getMyEvents(userId);
       setMyEvents(list);
     } catch (err: any) {
       console.warn('[MyEventsScreen] Error loading events:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     fetchMyEvents();
   }, [fetchMyEvents]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchMyEvents();
-  };
+  // Auto-refresh when entering MyEvents screen
+  useEffect(() => {
+    if (currentScreen === 'MyEvents') {
+      fetchMyEvents();
+    }
+  }, [currentScreen, fetchMyEvents]);
 
   const handleOpenDoc = (path?: string | null, docName: string = 'Document') => {
     if (!path || path.trim() === '') {
@@ -85,7 +85,6 @@ export const MyEventsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
       >
         {/* Title Header */}
         <View style={styles.titleSection}>
@@ -109,7 +108,7 @@ export const MyEventsScreen: React.FC = () => {
         </View>
 
         {/* Loading State */}
-        {loading && !refreshing ? (
+        {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text style={styles.loadingText}>Fetching your joined events...</Text>
@@ -184,7 +183,7 @@ export const MyEventsScreen: React.FC = () => {
                   {/* Roster & Team Information */}
                   <View style={styles.rosterCard}>
                     <Text style={styles.teamNameText}>🚩 Team: {item.team || 'Motorsport Racing'}</Text>
-                    {item.asn && <Text style={styles.asnText}>License: {item.asn}</Text>}
+                    {Boolean(item.asn) && <Text style={styles.asnText}>License: {item.asn}</Text>}
                     <View style={styles.driverRow}>
                       <Text style={styles.driverText}>🏎️ Driver: {item.driver_name || 'Racer'}</Text>
                       <Text style={styles.driverText}>🗺️ Navigator: {item.navigator_name || 'Navigator'}</Text>
@@ -203,7 +202,7 @@ export const MyEventsScreen: React.FC = () => {
                     <TouchableOpacity
                       style={styles.detailsBtn}
                       activeOpacity={0.8}
-                      onPress={() => openEventDetails(String(item.event_id), item)}
+                      onPress={() => openEventDetails(String(item.event_id), item as any)}
                     >
                       <Text style={styles.detailsBtnText}>View Details</Text>
                     </TouchableOpacity>
