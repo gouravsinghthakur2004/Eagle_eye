@@ -106,8 +106,7 @@ export const profileService = {
       try {
         const response = await client.post<UpdateProfileResponse>(
           ENDPOINTS.PROFILE.UPDATE,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
+          formData
         );
         if (response.data && response.data.user) {
           apiUser = response.data.user;

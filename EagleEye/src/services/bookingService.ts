@@ -179,9 +179,7 @@ export const bookingService = {
     for (const endpoint of endpoints) {
       // 1. Try Multipart FormData Post (PHP standard)
       try {
-        const res = await client.post(endpoint, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const res = await client.post(endpoint, formData);
         if (res.data) {
           const body = res.data;
           const isErr = typeof body === 'string' && body.includes('not a valid controller');

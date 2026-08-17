@@ -266,9 +266,7 @@ export const driverNavigatorService = {
     for (const endpoint of endpoints) {
       // 3A. Try multipart/form-data upload
       try {
-        const res = await client.post(endpoint, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const res = await client.post(endpoint, formData);
         if (res.data) {
           const body = res.data;
           const isControllerErr =
