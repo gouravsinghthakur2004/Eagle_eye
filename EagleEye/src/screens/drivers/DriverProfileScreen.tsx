@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,13 +8,19 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Platform,
+  PermissionsAndroid,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { COLORS } from '@/theme/colors';
-import { Header, InputField, PrimaryButton, KeyboardAwareFormContainer, FileUploadInput } from '@/components';
+import { Header, InputField, PrimaryButton, SecondaryButton } from '@/components';
 import { profileService, UserProfile } from '@/services/profileService';
-import { SelectedFile } from '@/utils/fileValidation';
-import { getUserAvatarUrl } from '@/utils/fileUrl';
+import { SelectedFile, fileValidation } from '@/utils/fileValidation';
+import { fileCompression } from '@/utils/fileCompression';
+import { getUserAvatarUrl, FALLBACK_AVATAR } from '@/utils/fileUrl';
+import { useAppNavigation } from '@/context/NavigationContext';
 
 const STATS = [
   { label: 'Events', value: '42', icon: '🏁' },
@@ -23,9 +29,31 @@ const STATS = [
   { label: 'Experience', value: '7 Yrs', icon: '⚡' },
 ];
 
+const requestCameraPermission = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') return true;
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      {
+        title: 'Camera Permission',
+        message: 'EagleEye requires camera access to take profile photos.',
+        buttonNeutral: 'Ask Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      }
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (err) {
+    console.warn('[Permissions] Camera error:', err);
+    return false;
+  }
+};
+
 export const DriverProfileScreen: React.FC = () => {
+  const { refreshProfile: refreshGlobalProfile } = useAppNavigation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Edit form state
@@ -37,7 +65,7 @@ export const DriverProfileScreen: React.FC = () => {
   const [editPincode, setEditPincode] = useState('');
   const [selectedProfilePic, setSelectedProfilePic] = useState<SelectedFile | null>(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const res = await profileService.getUserProfile();
@@ -55,22 +83,138 @@ export const DriverProfileScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [fetchProfile]);
+
+  const processAndSetImage = async (rawFile: SelectedFile) => {
+    const validation = fileValidation.validateFile(rawFile);
+    if (!validation.valid) {
+      Alert.alert('Validation Error', validation.error || 'Invalid image file.');
+      return;
+    }
+    const { file: processedFile } = await fileCompression.compressImageIfNeeded(rawFile);
+    setSelectedProfilePic(processedFile);
+  };
+
+  const handlePickFromCamera = async () => {
+    const hasPerm = await requestCameraPermission();
+    if (!hasPerm) {
+      Alert.alert('Permission Denied', 'Camera permission is required to capture photos.');
+      return;
+    }
+
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        saveToPhotos: false,
+      },
+      async (res) => {
+        if (res.didCancel || res.errorCode) return;
+        const asset = res.assets?.[0];
+        if (asset && asset.uri) {
+          await processAndSetImage({
+            uri: asset.uri,
+            name: asset.fileName || `avatar_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+            size: asset.fileSize || 500000,
+          });
+        }
+      }
+    );
+  };
+
+  const handlePickFromGallery = async () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        selectionLimit: 1,
+      },
+      async (res) => {
+        if (res.didCancel || res.errorCode) return;
+        const asset = res.assets?.[0];
+        if (asset && asset.uri) {
+          await processAndSetImage({
+            uri: asset.uri,
+            name: asset.fileName || `avatar_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+            size: asset.fileSize || 500000,
+          });
+        }
+      }
+    );
+  };
+
+  const showImagePickerOptions = () => {
+    Alert.alert(
+      'Profile Photo',
+      'Choose an option to update your profile photo:',
+      [
+        {
+          text: 'Take Photo 📷',
+          onPress: handlePickFromCamera,
+        },
+        {
+          text: 'Choose from Gallery 🖼️',
+          onPress: handlePickFromGallery,
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const handleDirectAvatarPress = () => {
+    Alert.alert(
+      'Update Profile Photo',
+      'Would you like to change your profile photo?',
+      [
+        {
+          text: 'Take Photo 📷',
+          onPress: async () => {
+            await handlePickFromCamera();
+            setIsEditModalOpen(true);
+          },
+        },
+        {
+          text: 'Choose from Gallery 🖼️',
+          onPress: async () => {
+            await handlePickFromGallery();
+            setIsEditModalOpen(true);
+          },
+        },
+        {
+          text: 'Edit Full Profile ✏️',
+          onPress: () => setIsEditModalOpen(true),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
 
   const handleUpdateProfile = async () => {
     try {
-      setLoading(true);
+      setSaving(true);
       const res = await profileService.updateUserProfile({
-        name: editName,
-        contact: editContact,
-        address: editAddress,
-        city: editCity,
-        state: editState,
-        pincode: editPincode,
+        name: editName.trim(),
+        contact: editContact.trim(),
+        address: editAddress.trim(),
+        city: editCity.trim(),
+        state: editState.trim(),
+        pincode: editPincode.trim(),
         profile_pic_file: selectedProfilePic,
       });
 
@@ -80,11 +224,12 @@ export const DriverProfileScreen: React.FC = () => {
       }
       setSelectedProfilePic(null);
       setIsEditModalOpen(false);
+      refreshGlobalProfile();
     } catch (error: any) {
       console.log('Update Profile Error:', error?.response?.data || error.message);
       Alert.alert('Update Failed', error?.response?.data?.message || 'Could not update profile.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -93,9 +238,11 @@ export const DriverProfileScreen: React.FC = () => {
     profile?.profile_pic_path
   );
 
+  const previewAvatarUri = selectedProfilePic?.uri || avatarDisplayUri;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Header title="Driver Profile" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Cover Photo */}
         <View style={styles.coverContainer}>
@@ -113,10 +260,10 @@ export const DriverProfileScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.avatarWrapper}
             activeOpacity={0.85}
-            onPress={() => setIsEditModalOpen(true)}
+            onPress={handleDirectAvatarPress}
           >
             <Image
-              source={{ uri: avatarDisplayUri }}
+              source={{ uri: avatarDisplayUri || FALLBACK_AVATAR }}
               style={styles.avatar}
             />
             <View style={styles.cameraOverlayBadge}>
@@ -190,35 +337,131 @@ export const DriverProfileScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Edit Profile Modal */}
-      <Modal visible={isEditModalOpen} transparent animationType="slide" onRequestClose={() => setIsEditModalOpen(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setIsEditModalOpen(false)}>
-                <Text style={styles.closeText}>✕</Text>
+      {/* Full Responsive Edit Profile Modal */}
+      <Modal
+        visible={isEditModalOpen}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setIsEditModalOpen(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
+          {/* Modal Header */}
+          <View style={styles.modalTopBar}>
+            <Text style={styles.modalTopTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => {
+                setSelectedProfilePic(null);
+                setIsEditModalOpen(false);
+              }}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Form Scroll Content */}
+          <ScrollView
+            style={styles.modalScrollView}
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Avatar Selection Section */}
+            <View style={styles.modalAvatarSection}>
+              <TouchableOpacity
+                style={styles.modalAvatarWrapper}
+                onPress={showImagePickerOptions}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: previewAvatarUri || FALLBACK_AVATAR }}
+                  style={styles.modalAvatarImage}
+                />
+                <View style={styles.modalCameraBadge}>
+                  <Text style={styles.modalCameraIcon}>📷</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.changePhotoBtn}
+                onPress={showImagePickerOptions}
+              >
+                <Text style={styles.changePhotoText}>
+                  {selectedProfilePic ? '✓ Photo Selected (Tap to change)' : 'Tap to Change Photo'}
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <KeyboardAwareFormContainer style={styles.modalScroll}>
-              <FileUploadInput
-                label="Profile Photo (JPG / PNG)"
-                value={selectedProfilePic?.uri || profile?.profile_pic_url || profile?.profile_pic_path}
-                onFileSelected={(file: SelectedFile | null) => setSelectedProfilePic(file)}
-                icon="📷"
-              />
-              <InputField label="Name" placeholder="Full name" value={editName} onChangeText={setEditName} icon="👤" />
-              <InputField label="Contact" placeholder="Phone number" value={editContact} onChangeText={setEditContact} icon="📱" keyboardType="phone-pad" />
-              <InputField label="Address" placeholder="Street address" value={editAddress} onChangeText={setEditAddress} icon="📍" />
-              <InputField label="City" placeholder="City" value={editCity} onChangeText={setEditCity} icon="🏙️" />
-              <InputField label="State" placeholder="State" value={editState} onChangeText={setEditState} icon="🗺️" />
-              <InputField label="Pincode" placeholder="Pincode" value={editPincode} onChangeText={setEditPincode} icon="📮" keyboardType="number-pad" />
+            {/* Editable Fields */}
+            <InputField
+              label="Full Name"
+              placeholder="e.g. John Doe"
+              value={editName}
+              onChangeText={setEditName}
+              icon="👤"
+            />
 
-              <PrimaryButton title={loading ? "Saving..." : "Save Profile"} icon="💾" onPress={handleUpdateProfile} disabled={loading} style={styles.saveBtn} />
-            </KeyboardAwareFormContainer>
-          </View>
-        </View>
+            <InputField
+              label="Contact Number"
+              placeholder="e.g. 9876543210"
+              value={editContact}
+              onChangeText={setEditContact}
+              icon="📱"
+              keyboardType="phone-pad"
+            />
+
+            <InputField
+              label="Street Address"
+              placeholder="e.g. 123 Paddock Lane"
+              value={editAddress}
+              onChangeText={setEditAddress}
+              icon="📍"
+            />
+
+            <InputField
+              label="City"
+              placeholder="e.g. Indore"
+              value={editCity}
+              onChangeText={setEditCity}
+              icon="🏙️"
+            />
+
+            <InputField
+              label="State"
+              placeholder="e.g. Madhya Pradesh"
+              value={editState}
+              onChangeText={setEditState}
+              icon="🗺️"
+            />
+
+            <InputField
+              label="Pincode"
+              placeholder="e.g. 452001"
+              value={editPincode}
+              onChangeText={setEditPincode}
+              icon="📮"
+              keyboardType="number-pad"
+            />
+
+            {/* Action Buttons */}
+            <View style={styles.modalActionButtons}>
+              <PrimaryButton
+                title={saving ? "Saving Changes..." : "Save Profile"}
+                icon="💾"
+                onPress={handleUpdateProfile}
+                disabled={saving}
+                style={styles.saveSubmitBtn}
+              />
+              <SecondaryButton
+                title="Cancel"
+                onPress={() => {
+                  setSelectedProfilePic(null);
+                  setIsEditModalOpen(false);
+                }}
+                style={styles.cancelBtn}
+              />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -230,7 +473,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
   coverContainer: {
     height: 140,
@@ -262,6 +505,7 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     borderWidth: 3,
     borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
   },
   cameraOverlayBadge: {
     position: 'absolute',
@@ -270,14 +514,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E1E1E',
     borderWidth: 2,
     borderColor: COLORS.primary,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cameraIcon: {
-    fontSize: 12,
+    fontSize: 14,
   },
   numberBadge: {
     position: 'absolute',
@@ -388,40 +632,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  modalContainer: {
+
+  // Modal Styles
+  modalSafeArea: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'flex-end',
+    backgroundColor: COLORS.background,
   },
-  modalContent: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  modalHeader: {
+  modalTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surfaceBorder,
   },
-  modalTitle: {
+  modalTopTitle: {
     color: COLORS.white,
     fontSize: 20,
     fontWeight: '800',
   },
-  closeText: {
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  modalCloseText: {
     color: COLORS.textMuted,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    padding: 4,
   },
-  modalScroll: {
-    paddingBottom: 20,
+  modalScrollView: {
+    flex: 1,
   },
-  saveBtn: {
-    marginTop: 14,
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  modalAvatarSection: {
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  modalAvatarWrapper: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  modalAvatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
+  modalCameraBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+  modalCameraIcon: {
+    fontSize: 14,
+  },
+  changePhotoBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  changePhotoText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalActionButtons: {
+    marginTop: 20,
+    gap: 12,
+  },
+  saveSubmitBtn: {
+    width: '100%',
+  },
+  cancelBtn: {
+    width: '100%',
   },
 });

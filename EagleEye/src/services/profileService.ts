@@ -150,6 +150,7 @@ export const profileService = {
       city: payload.city,
       state: payload.state,
       pincode: payload.pincode,
+      ...(payload.profile_pic_file?.uri ? { profile_pic_url: payload.profile_pic_file.uri } : {}),
       ...(apiUser || {}),
     };
 
