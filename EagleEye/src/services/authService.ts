@@ -161,12 +161,13 @@ export const AuthService = {
       const fileBlob = {
         uri: payload.profile_pic_file.uri,
         name: safeName,
-        type: payload.profile_pic_file.type || 'image/jpeg',
+        type: payload.profile_pic_file.type || (ext === 'png' ? 'image/png' : 'image/jpeg'),
       };
 
-      formData.append('profile_pic_upload', fileBlob as any);
+      // Primary file field expected by backend register controller
       formData.append('profile_pic', fileBlob as any);
-      formData.append('photo', fileBlob as any);
+      formData.append('profile_pic_path', fileBlob as any);
+      formData.append('profile_image', fileBlob as any);
 
       const response = await client.post<RegisterResponse>(
         ENDPOINTS.AUTH.REGISTER,

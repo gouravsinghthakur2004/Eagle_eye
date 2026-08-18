@@ -300,6 +300,17 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       AuthService.saveUserSession(undefined, userData);
     }
     setHistory(['Home']);
+
+    // Non-blocking fetch of full server profile (including profile_pic_path)
+    profileService
+      .getUserProfile()
+      .then((res) => {
+        if (res && res.user) {
+          setUser(res.user);
+          AuthService.saveUserSession(undefined, res.user);
+        }
+      })
+      .catch(() => {});
   };
 
   const logout = async () => {

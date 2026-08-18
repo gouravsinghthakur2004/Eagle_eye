@@ -96,12 +96,12 @@ export const profileService = {
       const fileBlob = {
         uri: payload.profile_pic_file.uri,
         name: safeName,
-        type: payload.profile_pic_file.type || 'image/jpeg',
+        type: payload.profile_pic_file.type || (extension === 'png' ? 'image/png' : 'image/jpeg'),
       };
 
-      formData.append('profile_pic_upload', fileBlob as any);
       formData.append('profile_pic', fileBlob as any);
-      formData.append('photo', fileBlob as any);
+      formData.append('profile_pic_path', fileBlob as any);
+      formData.append('profile_image', fileBlob as any);
 
       try {
         const response = await client.post<UpdateProfileResponse>(
