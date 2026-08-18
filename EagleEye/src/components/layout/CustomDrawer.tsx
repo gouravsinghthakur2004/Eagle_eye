@@ -13,6 +13,7 @@ import { COLORS } from '@/theme/colors';
 import { useAppNavigation, ScreenName } from '@/context/NavigationContext';
 import { DrawerItem } from './DrawerItem';
 import { APP_LOGO } from '@/assets';
+import { getUserAvatarUrl } from '@/utils/fileUrl';
 
 
 export const CustomDrawer: React.FC = () => {
@@ -33,6 +34,7 @@ export const CustomDrawer: React.FC = () => {
     { icon: '⚙️', label: 'Settings', screen: 'Settings' },
   ];
 
+  const avatarUri = getUserAvatarUrl(user?.profile_pic_url, user?.profile_pic_path);
 
   return (
     <Modal visible={isDrawerOpen} transparent animationType="fade" onRequestClose={closeDrawer}>
@@ -45,7 +47,7 @@ export const CustomDrawer: React.FC = () => {
               <View style={styles.avatarBorder}>
                 <Image
                   source={{
-                    uri: user?.profile_pic_url || user?.profile_pic_path || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+                    uri: avatarUri,
                   }}
                   style={styles.avatar}
                 />

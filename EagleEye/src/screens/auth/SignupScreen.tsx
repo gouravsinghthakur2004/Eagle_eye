@@ -8,13 +8,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/theme/colors';
-import { InputField, PrimaryButton, KeyboardAwareFormContainer } from '@/components';
+import { InputField, PrimaryButton, KeyboardAwareFormContainer, FileUploadInput } from '@/components';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { AuthService } from '@/services/authService';
 import { validateName, validateEmail, validatePhone } from '@/utils/formValidation';
+import { SelectedFile } from '@/utils/fileValidation';
 
 export const SignupScreen: React.FC = () => {
   const { navigate, goBack, setSignupEmail, setSignupPassword } = useAppNavigation();
+  const [selectedProfilePic, setSelectedProfilePic] = useState<SelectedFile | null>(null);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -27,6 +29,7 @@ export const SignupScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const resetForm = () => {
+    setSelectedProfilePic(null);
     setName('');
     setUsername('');
     setEmail('');
@@ -80,6 +83,7 @@ export const SignupScreen: React.FC = () => {
         city: city.trim(),
         state: state.trim(),
         pincode: pincode.trim(),
+        profile_pic_file: selectedProfilePic,
       });
 
       // Save email and credentials in context for Post-Signup OTP Verification and Auto-Login
@@ -127,6 +131,13 @@ export const SignupScreen: React.FC = () => {
 
         {/* Form */}
         <View style={styles.formCard}>
+          <FileUploadInput
+            label="Profile Photo (Optional)"
+            value={selectedProfilePic?.uri}
+            onFileSelected={(file: SelectedFile | null) => setSelectedProfilePic(file)}
+            icon="📷"
+          />
+
           <InputField
             label="Full Name"
             placeholder="e.g. John Doe"

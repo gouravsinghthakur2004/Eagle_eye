@@ -2,6 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 
+import { SelectedFile } from '@/utils/fileValidation';
+import { getSafeFileName } from '@/utils/fileUrl';
+
 export interface LoginResponse {
   status: string;
   message: string;
@@ -10,6 +13,8 @@ export interface LoginResponse {
     id: string;
     username: string;
     email: string;
+    profile_pic_path?: string;
+    profile_pic_url?: string;
   };
 }
 
@@ -29,6 +34,7 @@ export interface RegisterPayload {
   city: string;
   state: string;
   pincode: string;
+  profile_pic_file?: SelectedFile | null;
 }
 
 export interface RegisterResponse {
@@ -37,6 +43,7 @@ export interface RegisterResponse {
   message: string;
   otp?: number;
   profile_pic_url?: string;
+  profile_pic_path?: string;
   contact?: string;
   address?: string;
   city?: string;
@@ -147,12 +154,55 @@ export const AuthService = {
     }
   },
 
-  // 4. Register / Signup API with Fallback
+  // 4. Register / Signup API with Multipart & JSON Fallback
   register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
     try {
+      if (payload.profile_pic_file && payload.profile_pic_file.uri) {
+        const formData = new FormData();
+        formData.append('name', payload.name || '');
+        formData.append('username', payload.username || '');
+        formData.append('email', payload.email || '');
+        formData.append('password', payload.password || '');
+        formData.append('contact', payload.contact || '');
+        formData.append('address', payload.address || '');
+        formData.append('city', payload.city || '');
+        formData.append('state', payload.state || '');
+        formData.append('pincode', payload.pincode || '');
+
+        const ext = payload.profile_pic_file.type?.includes('png') ? 'png' : 'jpg';
+        const safeName = payload.profile_pic_file.name || getSafeFileName('profile_pic', undefined, ext);
+        const fileBlob = {
+          uri: payload.profile_pic_file.uri,
+          name: safeName,
+          type: payload.profile_pic_file.type || 'image/jpeg',
+        };
+
+        formData.append('profile_pic_upload', fileBlob as any);
+        formData.append('profile_pic', fileBlob as any);
+        formData.append('photo', fileBlob as any);
+
+        const response = await client.post<RegisterResponse>(
+          ENDPOINTS.AUTH.REGISTER,
+          formData
+        );
+        return response.data;
+      }
+
+      const cleanJson = {
+        name: payload.name,
+        username: payload.username,
+        email: payload.email,
+        password: payload.password,
+        contact: payload.contact,
+        address: payload.address,
+        city: payload.city,
+        state: payload.state,
+        pincode: payload.pincode,
+      };
+
       const response = await client.post<RegisterResponse>(
         ENDPOINTS.AUTH.REGISTER,
-        payload
+        cleanJson
       );
       return response.data;
     } catch (error: any) {

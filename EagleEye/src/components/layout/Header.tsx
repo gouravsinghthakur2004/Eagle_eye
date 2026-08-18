@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 import { COLORS } from '@/theme/colors';
 import { useAppNavigation } from '@/context/NavigationContext';
 import { APP_LOGO } from '@/assets';
+import { getUserAvatarUrl } from '@/utils/fileUrl';
 
 interface HeaderProps {
   showBack?: boolean;
@@ -11,7 +12,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ showBack, onBack, title }) => {
-  const { openDrawer, navigate, goBack, unreadCount } = useAppNavigation();
+  const { openDrawer, navigate, goBack, unreadCount, user } = useAppNavigation();
 
   const handleBackPress = () => {
     if (onBack) {
@@ -20,6 +21,8 @@ export const Header: React.FC<HeaderProps> = ({ showBack, onBack, title }) => {
       goBack();
     }
   };
+
+  const avatarUri = getUserAvatarUrl(user?.profile_pic_url, user?.profile_pic_path);
 
   return (
     <View style={styles.header}>
@@ -74,9 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ showBack, onBack, title }) => {
           onPress={() => navigate('Profile')}
         >
           <Image
-            source={{
-              uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-            }}
+            source={{ uri: avatarUri }}
             style={styles.avatar}
           />
         </TouchableOpacity>

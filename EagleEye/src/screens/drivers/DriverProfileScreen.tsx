@@ -14,6 +14,7 @@ import { COLORS } from '@/theme/colors';
 import { Header, InputField, PrimaryButton, KeyboardAwareFormContainer, FileUploadInput } from '@/components';
 import { profileService, UserProfile } from '@/services/profileService';
 import { SelectedFile } from '@/utils/fileValidation';
+import { getUserAvatarUrl } from '@/utils/fileUrl';
 
 const STATS = [
   { label: 'Events', value: '42', icon: '🏁' },
@@ -77,6 +78,7 @@ export const DriverProfileScreen: React.FC = () => {
       if (res && res.user) {
         setProfile(res.user);
       }
+      setSelectedProfilePic(null);
       setIsEditModalOpen(false);
     } catch (error: any) {
       console.log('Update Profile Error:', error?.response?.data || error.message);
@@ -85,6 +87,11 @@ export const DriverProfileScreen: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const avatarDisplayUri = getUserAvatarUrl(
+    profile?.profile_pic_url,
+    profile?.profile_pic_path
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -103,17 +110,22 @@ export const DriverProfileScreen: React.FC = () => {
 
         {/* Profile Info Header */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatarWrapper}>
+          <TouchableOpacity
+            style={styles.avatarWrapper}
+            activeOpacity={0.85}
+            onPress={() => setIsEditModalOpen(true)}
+          >
             <Image
-              source={{
-                uri: profile?.profile_pic_url || profile?.profile_pic_path || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-              }}
+              source={{ uri: avatarDisplayUri }}
               style={styles.avatar}
             />
+            <View style={styles.cameraOverlayBadge}>
+              <Text style={styles.cameraIcon}>📷</Text>
+            </View>
             <View style={styles.numberBadge}>
               <Text style={styles.numberText}>#{profile?.id || '1'}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <Text style={styles.driverName}>{profile?.name || profile?.username || 'Racer'}</Text>
           <Text style={styles.categoryText}>@{profile?.username || 'driver'} • {profile?.email || 'N/A'}</Text>
@@ -250,6 +262,22 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     borderWidth: 3,
     borderColor: COLORS.primary,
+  },
+  cameraOverlayBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#1E1E1E',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraIcon: {
+    fontSize: 12,
   },
   numberBadge: {
     position: 'absolute',
