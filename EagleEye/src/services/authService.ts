@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
-
 import { SelectedFile } from '@/utils/fileValidation';
 import { getSafeFileName } from '@/utils/fileUrl';
 
@@ -15,6 +14,8 @@ export interface LoginResponse {
     email: string;
     profile_pic_path?: string;
     profile_pic_url?: string;
+    name?: string;
+    contact?: string;
   };
 }
 
@@ -22,6 +23,7 @@ export interface GenericApiResponse {
   status: string;
   message: string;
   otp?: number;
+  data?: any;
 }
 
 export interface RegisterPayload {
@@ -51,218 +53,206 @@ export interface RegisterResponse {
   pincode?: string;
 }
 
-/* eslint-disable no-bitwise */
-const generateUserIdFromUsername = (str: string): string => {
-  if (!str) return String(Date.now());
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return String(Math.abs(hash) || 100);
-};
-/* eslint-enable no-bitwise */
-
 export const AuthService = {
-  // 1. Login API with Resilient Network Error Fallback
+  /**
+   * 1. Login API
+   * Transmits raw credentials via JSON without altering password casing or whitespace.
+   */
   login: async (username: string, password?: string): Promise<LoginResponse> => {
-    try {
-      const response = await client.post<LoginResponse>(
-        ENDPOINTS.AUTH.LOGIN,
-        {
-          username,
-          password,
-        }
-      );
+    const trimmedUsername = (username || '').trim();
+    const rawPassword = password || '';
 
-      const result = response.data;
-
-      // Securely persist token and user session data
-      if (result && result.token) {
-        await AsyncStorage.setItem('authToken', result.token);
+    const response = await client.post<LoginResponse>(
+      ENDPOINTS.AUTH.LOGIN,
+      {
+        username: trimmedUsername,
+        password: rawPassword,
       }
-      if (result && result.data) {
-        await AsyncStorage.setItem('user', JSON.stringify(result.data));
-      }
+    );
 
-      return result;
-    } catch (error: any) {
-      console.warn('[AuthService.login] API error, checking fallback:', error?.message);
+    const result = response.data;
 
-      // If network connection error or timeout occurs on emulator/device
-      const isNetworkError =
-        !error.response ||
-        error.message?.includes('Network Error') ||
-        error.message?.includes('timeout') ||
-        error.code === 'ECONNABORTED';
-
-      if (isNetworkError) {
-        const userId = generateUserIdFromUsername(username);
-        const mockResult: LoginResponse = {
-          status: 'success',
-          message: 'Logged in successfully',
-          token: `token_${userId}_${Date.now()}`,
-          data: {
-            id: userId,
-            username: username || 'racer',
-            email: username.includes('@') ? username : `${username}@eagleeye.com`,
-          },
-        };
-
-        await AsyncStorage.setItem('authToken', mockResult.token);
-        await AsyncStorage.setItem('user', JSON.stringify(mockResult.data));
-        return mockResult;
-      }
-
-      throw error;
+    // Check backend status error in 200 OK responses
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Invalid username/email or password.');
     }
+
+    if (!result || !result.token) {
+      throw new Error(result?.message || 'Login failed. No authentication token received.');
+    }
+
+    // Securely persist token and user session data in centralized storage
+    await AsyncStorage.setItem('authToken', result.token);
+    if (result.data) {
+      await AsyncStorage.setItem('user', JSON.stringify(result.data));
+    }
+
+    return result;
   },
 
-
-  // 2. Request OTP API with Fallback
+  /**
+   * 2. Request OTP API (For Forgot Password)
+   */
   requestOtp: async (email: string): Promise<GenericApiResponse> => {
-    try {
-      const response = await client.post<GenericApiResponse>(
-        ENDPOINTS.AUTH.REQUEST_OTP,
-        { email }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[AuthService.requestOtp] API error:', error?.message);
-      return {
-        status: 'success',
-        message: `OTP sent successfully to ${email}`,
-        otp: 123456,
-      };
+    const trimmedEmail = (email || '').trim();
+
+    const response = await client.post<GenericApiResponse>(
+      ENDPOINTS.AUTH.REQUEST_OTP,
+      { email: trimmedEmail }
+    );
+
+    const result = response.data;
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Email not registered with us.');
     }
+
+    return result;
   },
 
-  // 3. Verify OTP API with Fallback
+  /**
+   * 3. Verify OTP API (For Forgot Password)
+   */
   verifyOtp: async (email: string, otp: string): Promise<GenericApiResponse> => {
-    try {
-      const response = await client.post<GenericApiResponse>(
-        ENDPOINTS.AUTH.VERIFY_OTP,
-        { email, otp }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[AuthService.verifyOtp] API error:', error?.message);
-      return {
-        status: 'success',
-        message: 'OTP verified successfully.',
-      };
+    const trimmedEmail = (email || '').trim();
+    const cleanOtp = String(otp || '').trim();
+
+    const response = await client.post<GenericApiResponse>(
+      ENDPOINTS.AUTH.VERIFY_OTP,
+      { email: trimmedEmail, otp: cleanOtp }
+    );
+
+    const result = response.data;
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Invalid or expired OTP code.');
     }
+
+    return result;
   },
 
-  // 4. Register / Signup API with Multipart & JSON Fallback
+  /**
+   * 4. Register / Signup API
+   * Strictly preserves password integrity and supports optional profile photo multipart upload.
+   */
   register: async (payload: RegisterPayload): Promise<RegisterResponse> => {
-    try {
-      if (payload.profile_pic_file && payload.profile_pic_file.uri) {
-        const formData = new FormData();
-        formData.append('name', payload.name || '');
-        formData.append('username', payload.username || '');
-        formData.append('email', payload.email || '');
-        formData.append('password', payload.password || '');
-        formData.append('contact', payload.contact || '');
-        formData.append('address', payload.address || '');
-        formData.append('city', payload.city || '');
-        formData.append('state', payload.state || '');
-        formData.append('pincode', payload.pincode || '');
+    const trimmedName = (payload.name || '').trim();
+    const trimmedUsername = (payload.username || '').trim();
+    const trimmedEmail = (payload.email || '').trim();
+    const rawPassword = payload.password; // Do not alter password
+    const trimmedContact = (payload.contact || '').trim();
+    const trimmedAddress = (payload.address || '').trim();
+    const trimmedCity = (payload.city || '').trim();
+    const trimmedState = (payload.state || '').trim();
+    const trimmedPincode = (payload.pincode || '').trim();
 
-        const ext = payload.profile_pic_file.type?.includes('png') ? 'png' : 'jpg';
-        const safeName = payload.profile_pic_file.name || getSafeFileName('profile_pic', undefined, ext);
-        const fileBlob = {
-          uri: payload.profile_pic_file.uri,
-          name: safeName,
-          type: payload.profile_pic_file.type || 'image/jpeg',
-        };
+    if (payload.profile_pic_file && payload.profile_pic_file.uri) {
+      const formData = new FormData();
+      formData.append('name', trimmedName);
+      formData.append('username', trimmedUsername);
+      formData.append('email', trimmedEmail);
+      formData.append('password', rawPassword);
+      formData.append('contact', trimmedContact);
+      formData.append('address', trimmedAddress);
+      formData.append('city', trimmedCity);
+      formData.append('state', trimmedState);
+      formData.append('pincode', trimmedPincode);
 
-        formData.append('profile_pic_upload', fileBlob as any);
-        formData.append('profile_pic', fileBlob as any);
-        formData.append('photo', fileBlob as any);
-
-        const response = await client.post<RegisterResponse>(
-          ENDPOINTS.AUTH.REGISTER,
-          formData
-        );
-        return response.data;
-      }
-
-      const cleanJson = {
-        name: payload.name,
-        username: payload.username,
-        email: payload.email,
-        password: payload.password,
-        contact: payload.contact,
-        address: payload.address,
-        city: payload.city,
-        state: payload.state,
-        pincode: payload.pincode,
+      const ext = payload.profile_pic_file.type?.includes('png') ? 'png' : 'jpg';
+      const safeName = payload.profile_pic_file.name || getSafeFileName('profile_pic', undefined, ext);
+      const fileBlob = {
+        uri: payload.profile_pic_file.uri,
+        name: safeName,
+        type: payload.profile_pic_file.type || 'image/jpeg',
       };
+
+      formData.append('profile_pic_upload', fileBlob as any);
+      formData.append('profile_pic', fileBlob as any);
+      formData.append('photo', fileBlob as any);
 
       const response = await client.post<RegisterResponse>(
         ENDPOINTS.AUTH.REGISTER,
-        cleanJson
+        formData
       );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[AuthService.register] API error, checking fallback:', error?.message);
 
-      const isNetworkError =
-        !error.response ||
-        error.message?.includes('Network Error') ||
-        error.message?.includes('timeout') ||
-        error.code === 'ECONNABORTED';
-
-      if (isNetworkError) {
-        return {
-          status: 'success',
-          name: payload.name,
-          message: 'Signup successful! OTP sent to your registered email.',
-          otp: 123456,
-        };
+      const result = response.data;
+      if (result && (result.status === 'error' || (result as any).status === 0)) {
+        throw new Error(result.message || 'Registration failed.');
       }
-
-      throw error;
+      return result;
     }
+
+    const cleanJson = {
+      name: trimmedName,
+      username: trimmedUsername,
+      email: trimmedEmail,
+      password: rawPassword,
+      contact: trimmedContact,
+      address: trimmedAddress,
+      city: trimmedCity,
+      state: trimmedState,
+      pincode: trimmedPincode,
+    };
+
+    const response = await client.post<RegisterResponse>(
+      ENDPOINTS.AUTH.REGISTER,
+      cleanJson
+    );
+
+    const result = response.data;
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Registration failed.');
+    }
+    return result;
   },
 
-  // 5. Verify Register OTP API with Fallback
+  /**
+   * 5. Verify Register OTP API (For Account Activation after Signup)
+   */
   verifyRegisterOtp: async (email: string, otp: string): Promise<GenericApiResponse> => {
-    try {
-      const response = await client.post<GenericApiResponse>(
-        ENDPOINTS.AUTH.VERIFY_REGISTER_OTP,
-        { email, otp }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[AuthService.verifyRegisterOtp] API error:', error?.message);
-      return {
-        status: 'success',
-        message: 'Registration account verified successfully!',
-      };
+    const trimmedEmail = (email || '').trim();
+    const cleanOtp = String(otp || '').trim();
+
+    const response = await client.post<GenericApiResponse>(
+      ENDPOINTS.AUTH.VERIFY_REGISTER_OTP,
+      { email: trimmedEmail, otp: cleanOtp }
+    );
+
+    const result = response.data;
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Invalid or expired verification OTP.');
     }
+
+    return result;
   },
 
-  // 6. Reset Password API with Fallback
+  /**
+   * 6. Reset Password API
+   * Strictly updates user password without double hashing.
+   */
   resetPassword: async (email: string, otp: string, new_password: string): Promise<GenericApiResponse> => {
-    try {
-      const response = await client.post<GenericApiResponse>(
-        ENDPOINTS.AUTH.RESET_PASSWORD,
-        { email, otp, new_password }
-      );
-      return response.data;
-    } catch (error: any) {
-      console.warn('[AuthService.resetPassword] API error:', error?.message);
-      return {
-        status: 'success',
-        message: 'Password reset successfully.',
-      };
+    const trimmedEmail = (email || '').trim();
+    const cleanOtp = String(otp || '').trim();
+    const rawNewPassword = new_password; // Preserved raw
+
+    const response = await client.post<GenericApiResponse>(
+      ENDPOINTS.AUTH.RESET_PASSWORD,
+      {
+        email: trimmedEmail,
+        otp: cleanOtp,
+        new_password: rawNewPassword,
+      }
+    );
+
+    const result = response.data;
+    if (result && (result.status === 'error' || (result as any).status === 0)) {
+      throw new Error(result.message || 'Failed to reset password. Please check your OTP.');
     }
+
+    return result;
   },
 
-
-  // Retrieve Persisted Token
+  /**
+   * Retrieve Persisted Token
+   */
   getStoredToken: async (): Promise<string | null> => {
     try {
       return await AsyncStorage.getItem('authToken');
@@ -271,7 +261,9 @@ export const AuthService = {
     }
   },
 
-  // Retrieve Persisted User
+  /**
+   * Retrieve Persisted User
+   */
   getStoredUser: async (): Promise<any | null> => {
     try {
       const data = await AsyncStorage.getItem('user');
@@ -281,7 +273,9 @@ export const AuthService = {
     }
   },
 
-  // Save Session Helper
+  /**
+   * Save Session Helper
+   */
   saveUserSession: async (token?: string, user?: any): Promise<void> => {
     try {
       if (token) {
@@ -295,7 +289,9 @@ export const AuthService = {
     }
   },
 
-  // Complete Logout Helper
+  /**
+   * Complete Logout Helper
+   */
   logout: async (): Promise<void> => {
     try {
       await AsyncStorage.removeItem('authToken');

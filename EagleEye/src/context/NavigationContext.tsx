@@ -238,9 +238,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       setIsLoading(true);
 
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 300));
-      token = await Promise.race([AuthService.getStoredToken(), timeoutPromise]);
-      const storedUser = await Promise.race([AuthService.getStoredUser(), timeoutPromise]);
+      token = await AuthService.getStoredToken();
+      const storedUser = await AuthService.getStoredUser();
 
       if (token && storedUser) {
         setIsAuthenticated(true);

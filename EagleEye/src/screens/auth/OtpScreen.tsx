@@ -132,15 +132,17 @@ export const OtpScreen: React.FC = () => {
         </View>
 
         <View style={styles.card}>
-          <TextInput
-            style={styles.emailInput}
-            placeholder="Enter your email address"
-            placeholderTextColor={COLORS.textMuted}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          {!resetEmail ? (
+            <TextInput
+              style={styles.emailInput}
+              placeholder="Enter your registered email address"
+              placeholderTextColor={COLORS.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          ) : null}
 
           <View style={styles.otpRow}>
             {otp.map((digit, index) => (

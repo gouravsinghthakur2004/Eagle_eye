@@ -106,28 +106,29 @@ export const PostSignupOtpScreen: React.FC = () => {
 
     try {
       setLoading(true);
-      const res = await AuthService.verifyRegisterOtp(trimmedEmail, otpCode);
+      await AuthService.verifyRegisterOtp(trimmedEmail, otpCode);
 
-      Alert.alert('Success 🏁', res.message || 'OTP verified successfully! Auto-logging you in...', [
-        {
-          text: 'Continue',
-          onPress: async () => {
-            if (signupPassword) {
-              try {
-                const loginRes = await AuthService.login(trimmedEmail, signupPassword);
-                onLoginSuccess(loginRes.data as any);
-              } catch {
-                navigate('Login');
-              }
-            } else {
-              navigate('Login');
-            }
-          },
-        },
-      ]);
+      // Successfully verified -> Auto-login with signup credentials
+      if (signupPassword) {
+        try {
+          const loginRes = await AuthService.login(trimmedEmail, signupPassword);
+          onLoginSuccess(loginRes.data as any);
+          return;
+        } catch (loginErr: any) {
+          console.warn('[PostSignupOtp] Auto-login failed, redirecting to Login:', loginErr?.message);
+          navigate('Login');
+          return;
+        }
+      }
+
+      // If password was missing from memory context, navigate to Login
+      navigate('Login');
     } catch (error: any) {
       console.log('Post-Signup OTP Verification Error:', error?.response?.data || error.message);
-      const msg = error?.response?.data?.message || error?.message || 'Invalid or expired OTP. Please check and try again.';
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Invalid or expired verification OTP. Please check and try again.';
       Alert.alert('Verification Failed', msg);
     } finally {
       setLoading(false);
