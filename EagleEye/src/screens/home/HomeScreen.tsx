@@ -10,7 +10,6 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
-  RefreshControl,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Linking,
@@ -37,7 +36,6 @@ export const HomeScreen: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
   const [joinedEventIds, setJoinedEventIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const bannerFlatListRef = useRef<FlatList<ApiBannerItem>>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState<number>(0);
@@ -118,7 +116,6 @@ export const HomeScreen: React.FC = () => {
       console.warn('[HomeScreen] Error loading live data:', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -161,11 +158,6 @@ export const HomeScreen: React.FC = () => {
 
     return () => clearInterval(timer);
   }, [upcomingEvents.length, isUserInteracting]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadHomeData();
-  };
 
   const handleBannerPress = (banner: ApiBannerItem) => {
     if (banner.event_id) {
@@ -222,14 +214,6 @@ export const HomeScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={COLORS.primary}
-            colors={[COLORS.primary]}
-          />
-        }
       >
         {/* Search Bar */}
         <View style={styles.searchSection}>
@@ -345,7 +329,7 @@ export const HomeScreen: React.FC = () => {
         </View>
 
         {/* Real API Event FlatList Horizontal Carousel */}
-        {loading && !refreshing ? (
+        {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="small" color={COLORS.primary} />
             <Text style={styles.loadingText}>Loading live API events...</Text>
