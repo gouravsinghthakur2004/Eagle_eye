@@ -35,7 +35,13 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>EagleEye uses your location to show nearby motorsport events and tracks.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>EagleEye requires camera access to capture profile photos and motorsport documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EagleEye requires photo library access to select driver licenses, vehicle documents, and profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>EagleEye requires permission to save photos to your photo library.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
