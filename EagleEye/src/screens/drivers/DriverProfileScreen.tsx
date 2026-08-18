@@ -10,7 +10,6 @@ import {
   Modal,
   Platform,
   PermissionsAndroid,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
@@ -52,9 +51,10 @@ const requestCameraPermission = async (): Promise<boolean> => {
 export const DriverProfileScreen: React.FC = () => {
   const { refreshProfile: refreshGlobalProfile } = useAppNavigation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPhotoSheetOpen, setIsPhotoSheetOpen] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -97,9 +97,13 @@ export const DriverProfileScreen: React.FC = () => {
     }
     const { file: processedFile } = await fileCompression.compressImageIfNeeded(rawFile);
     setSelectedProfilePic(processedFile);
+
+    // If modal is not open, open it so user can review and save
+    setIsEditModalOpen(true);
   };
 
   const handlePickFromCamera = async () => {
+    setIsPhotoSheetOpen(false);
     const hasPerm = await requestCameraPermission();
     if (!hasPerm) {
       Alert.alert('Permission Denied', 'Camera permission is required to capture photos.');
@@ -130,6 +134,7 @@ export const DriverProfileScreen: React.FC = () => {
   };
 
   const handlePickFromGallery = async () => {
+    setIsPhotoSheetOpen(false);
     launchImageLibrary(
       {
         mediaType: 'photo',
@@ -150,58 +155,6 @@ export const DriverProfileScreen: React.FC = () => {
           });
         }
       }
-    );
-  };
-
-  const showImagePickerOptions = () => {
-    Alert.alert(
-      'Profile Photo',
-      'Choose an option to update your profile photo:',
-      [
-        {
-          text: 'Take Photo 📷',
-          onPress: handlePickFromCamera,
-        },
-        {
-          text: 'Choose from Gallery 🖼️',
-          onPress: handlePickFromGallery,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
-  };
-
-  const handleDirectAvatarPress = () => {
-    Alert.alert(
-      'Update Profile Photo',
-      'Would you like to change your profile photo?',
-      [
-        {
-          text: 'Take Photo 📷',
-          onPress: async () => {
-            await handlePickFromCamera();
-            setIsEditModalOpen(true);
-          },
-        },
-        {
-          text: 'Choose from Gallery 🖼️',
-          onPress: async () => {
-            await handlePickFromGallery();
-            setIsEditModalOpen(true);
-          },
-        },
-        {
-          text: 'Edit Full Profile ✏️',
-          onPress: () => setIsEditModalOpen(true),
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
     );
   };
 
@@ -260,7 +213,7 @@ export const DriverProfileScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.avatarWrapper}
             activeOpacity={0.85}
-            onPress={handleDirectAvatarPress}
+            onPress={() => setIsPhotoSheetOpen(true)}
           >
             <Image
               source={{ uri: avatarDisplayUri || FALLBACK_AVATAR }}
@@ -277,7 +230,19 @@ export const DriverProfileScreen: React.FC = () => {
           <Text style={styles.driverName}>{profile?.name || profile?.username || 'Racer'}</Text>
           <Text style={styles.categoryText}>@{profile?.username || 'driver'} • {profile?.email || 'N/A'}</Text>
 
-          <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditModalOpen(true)}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            activeOpacity={0.8}
+            onPress={() => {
+              setEditName(profile?.name || '');
+              setEditContact(profile?.contact || '');
+              setEditAddress(profile?.address || '');
+              setEditCity(profile?.city || '');
+              setEditState(profile?.state || '');
+              setEditPincode(profile?.pincode || '');
+              setIsEditModalOpen(true);
+            }}
+          >
             <Text style={styles.editBtnText}>✏️ Edit Profile</Text>
           </TouchableOpacity>
         </View>
@@ -337,7 +302,64 @@ export const DriverProfileScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Full Responsive Edit Profile Modal */}
+      {/* PHOTO SELECTION ACTION SHEET MODAL */}
+      <Modal
+        visible={isPhotoSheetOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsPhotoSheetOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setIsPhotoSheetOpen(false)}
+        >
+          <View style={styles.sheetContent}>
+            <Text style={styles.sheetTitle}>Update Profile Photo</Text>
+            <Text style={styles.sheetSubtitle}>Choose an option to change your avatar</Text>
+
+            <TouchableOpacity
+              style={styles.sheetOption}
+              activeOpacity={0.8}
+              onPress={handlePickFromCamera}
+            >
+              <Text style={styles.sheetOptionIcon}>📷</Text>
+              <Text style={styles.sheetOptionText}>Take Photo (Camera)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sheetOption}
+              activeOpacity={0.8}
+              onPress={handlePickFromGallery}
+            >
+              <Text style={styles.sheetOptionIcon}>🖼️</Text>
+              <Text style={styles.sheetOptionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sheetOption}
+              activeOpacity={0.8}
+              onPress={() => {
+                setIsPhotoSheetOpen(false);
+                setIsEditModalOpen(true);
+              }}
+            >
+              <Text style={styles.sheetOptionIcon}>✏️</Text>
+              <Text style={styles.sheetOptionText}>Edit Full Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sheetCancelBtn}
+              activeOpacity={0.8}
+              onPress={() => setIsPhotoSheetOpen(false)}
+            >
+              <Text style={styles.sheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* FULL RESPONSIVE EDIT PROFILE MODAL */}
       <Modal
         visible={isEditModalOpen}
         animationType="slide"
@@ -370,7 +392,7 @@ export const DriverProfileScreen: React.FC = () => {
             <View style={styles.modalAvatarSection}>
               <TouchableOpacity
                 style={styles.modalAvatarWrapper}
-                onPress={showImagePickerOptions}
+                onPress={() => setIsPhotoSheetOpen(true)}
                 activeOpacity={0.8}
               >
                 <Image
@@ -383,7 +405,7 @@ export const DriverProfileScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.changePhotoBtn}
-                onPress={showImagePickerOptions}
+                onPress={() => setIsPhotoSheetOpen(true)}
               >
                 <Text style={styles.changePhotoText}>
                   {selectedProfilePic ? '✓ Photo Selected (Tap to change)' : 'Tap to Change Photo'}
@@ -631,6 +653,64 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Action Sheet Styles
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  sheetContent: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    borderTopWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  sheetTitle: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  sheetSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  sheetOptionIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  sheetOptionText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sheetCancelBtn: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  sheetCancelText: {
+    color: COLORS.error,
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   // Modal Styles
